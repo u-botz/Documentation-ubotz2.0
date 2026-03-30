@@ -1,16 +1,36 @@
 # UBOTZ 2.0 Attendance Business Findings
 
 ## Executive Summary
-For LMS tenants augmenting online operations with physical classrooms or mandated live digital cohorts, the Attendance infrastructure satisfies rigorous structural reporting. It enforces pedagogical oversight and guarantees parents/organizations visibility over student consistency.
 
-## Operational Modalities
+Attendance links **scheduled teaching moments** (optionally tied to **batches**, **subjects**, **teachers**, and **branches**) to **per-student marks** within a tenant. It supports **bulk marking**, **session completion**, **tenant-wide settings** (thresholds, lock timing, default modes), and an **audit trail** for defensible records.
 
-### The Session Roster
-- The system hinges on generating formal `Attendance Sessions`. These sessions outline the *expected* temporal boundaries (`start_time`, `end_time`) attached closely to specific B2B `batches` and geographic `branches`.
+Operational **reports**, **staff attendance**, and **student self-service** summaries are only partially reflected in **live HTTP routes** — several endpoints remain commented out in `attendance.php`. Product planning should treat the technical specification as the checklist of what is actually exposed.
 
-### Auditing and Immutability (`locked_at`)
-- Most B2B LMS operations suffer from post-facto modification fraud (markings changed weeks later to satisfy performance bonuses). UBOTZ implements a strict `locked_at` mechanism. Once the instructor finalizes the roster and the system locks it, historical tampering is permanently barred.
-- The `marked_by` audit column directly tracks the exact staff ID applying the final sign-off, facilitating dispute resolutions.
+---
 
-### Administrative Triggers
-Attendance directly feeds broader business CRM pipelines. Consistent flagging of individual "absent" markings can dynamically invoke parent notification systems or retention/outreach interventions by the tenant's support team.
+## Session lifecycle
+
+- **Sessions** carry date/time, context (batch/subject/teacher/branch), marking state, cancellation, and notes.
+- **Completion** records who finalized the roster (`marked_by` / `marked_at`).
+- **Locking** (`locked_at`) is the primary control for **when** ordinary edits should stop; **overrides** are reserved for roles with explicit override permission (see technical doc).
+
+---
+
+## Policy & thresholds
+
+- **`attendance_settings`** holds tenant rules such as **lock period**, **attendance threshold** (percentage and period), and whether **excused** absences adjust denominators.
+- These settings feed application logic (e.g. threshold events during marking) rather than being “documentation-only” fields.
+
+---
+
+## Integrations & roadmap
+
+- **Timetable:** optional `timetable_session_id` with uniqueness per tenant to avoid duplicate attendance shells for the same timetable slot.
+- **CRM / notifications:** domain events and listeners can connect to parent outreach; wire-up depends on tenant configuration.
+- **Dashboard:** global and teacher dashboards can show high-level attendance KPIs without exposing the full session API in the SPA.
+
+---
+
+## Linked references
+
+- **Technical specification:** `Ubotz_2_attendance_technical_documentation.md` (routes, schema, capabilities, commented routes).
