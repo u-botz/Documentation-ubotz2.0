@@ -1,31 +1,50 @@
-# UBOTZ 2.0 Subscription Technical Specification
+# UBOTZ 2.0 — Subscription (tenant LMS plans) — Technical Specification
 
-## Core Architecture
-The Subscription module resides in the Central Database to ensure platform-wide consistency and prevent tenants from modifying their own billing metadata.
+## Scope
 
-## Relational Schema Constraints
+This feature is **tenant-scoped subscription plans** used to **sell or grant time-bound access** to students inside an institution (e.g. bundled days/uses). It is **not** the same as **UBOTZ platform billing** (the landlord’s subscription for the tenant organization), which lives under `/api/platform/...` and central platform tables.
 
-### 1. Plan Definitions (`subscription_plans`)
-- **`code`**: Unique machine-readable SKU.
-- **`price_monthly` / `price_annual`**: Stored as BigInt cents.
-- **`features`**: JSON column storing specific feature flags (e.g., SSO: true).
+## Route entry point
 
-### 2. Active Tracking (`tenant_subscriptions`)
-- **`current_period_ends_at`**: The timestamp used by the `CheckTenantStatusMiddleware` to verify active access.
-- **`gateway_subscription_id`**: The raw reference to the Stripe/Razorpay subscription object.
-- **Indices**: `idx_subscriptions_period_end` optimizes the bulk "Past Due" scheduler that runs daily.
+| File | Prefix |
+|------|--------|
+| `backend/routes/tenant_dashboard/subscription.php` | `/api/tenant/subscription-plans` |
 
-## Hard Resource Constraints
-The platform enforces plan limits at the Application Tier.
-- **User Limits**: Checked during `User::create` via the `TenantSubscriptionService`.
-- **Course Limits**: Checked during `Course::published`.
-- **Storage**: Monitored via the File Manager before committing new S3 uploads.
+| Method | Path | Capability |
+|--------|------|------------|
+| GET | `/subscription-plans` | `subscription.manage` (group middleware) |
+| POST | `/subscription-plans` | `subscription.manage` |
+| POST | `/subscription-plans/enroll` | `subscription.manage` **and** `subscription.enroll` |
+| GET | `/subscription-plans/{planId}` | `subscription.manage` |
+| PUT | `/subscription-plans/{planId}` | `subscription.manage` |
+| DELETE | `/subscription-plans/{planId}` | `subscription.manage` |
 
-## Security & Payment Integrity
-- **Idempotency**: `idempotency_key` on the `tenant_subscriptions` table prevents duplicate plan assignments during browser retries or webhook delays.
-- **Locked Prices**: `locked_prices` boolean ensures that if a plan's price is updated, existing tenants remain on their legacy pricing until their next renewal cycle.
+Controllers: `SubscriptionPlanReadController`, `SubscriptionPlanWriteController`, invokable `EnrollSubscriptionPlanController` → `ActivateSubscriptionUseCase` with `ActivateSubscriptionCommand` (`user_id`, `plan_id`).
+
+**Note:** `TenantCapabilitySeeder` also defines **`subscription.view`** for read-only plan/enrollment visibility; this route file currently attaches **`subscription.manage`** to **all** plan routes—product may add read routes or policy checks separately if view-without-manage is required.
+
+## Persistence (tenant)
+
+`backend/database/migrations/tenant/2026_03_09_045728_create_tenant_subscription_plans_table.php` → **`tenant_subscription_plans`**:
+
+- `tenant_id`, `title`, `description`, `days`, `usable_count`, `infinite_use`, `price_cents`, `status`, timestamps
+
+Enrollment storage is handled by subscription domain repositories used from `ActivateSubscriptionUseCase` (trace implementation for exact enrollment table names).
+
+## Platform vs tenant (disambiguation)
+
+| Concern | Where |
+|---------|--------|
+| Institution **pays UBOTZ** | Platform APIs, `subscription_plans` / tenant billing in **central** context — see `PLATFORM_*` in `api-endpoints.ts` |
+| Institution **sells a plan to its students** | This document — **`tenant_subscription_plans`** under `/api/tenant/subscription-plans` |
+
+## Frontend
+
+Per-user grant/revoke helpers may appear under **user** APIs (e.g. `TENANT_USER.GRANT_SUBSCRIPTION` in `api-endpoints.ts`); that is a different surface from CRUD on `subscription-plans`.
 
 ---
 
-## Linked References
-- Related Modules: `Tenant-Provisioning`, `Payment`.
+## Linked references
+
+- **Users** — enrollment targets
+- **Payment** — student-side settlement when a plan has a price

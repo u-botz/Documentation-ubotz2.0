@@ -1,37 +1,67 @@
-# UBOTZ 2.0 Notification System Technical Specification
+# UBOTZ 2.0 — Notifications — Technical Specification
 
-## Core Architecture
-The Notification system follows an "Observer/Subscriber" pattern (`TenantAdminDashboard\Notification`). It acts as a downstream consumer for almost every other domain context.
+## Scope
 
-## Relational Schema Constraints
+Two surfaces:
 
-### 1. Preferences (`notification_preferences`)
-- **`tenant_id` / `user_id`**: Structural isolation.
-- **`type`**: The category of notification (e.g., `payment_success`).
-- **`is_enabled`**: Boolean flag.
+1. **Tenant users** — in-app notification inbox + per-user channel preferences (`/api/tenant/...`).
+2. **Platform admins** — separate inbox under `/api/platform/...` (Super Admin JWT), defined in `backend/routes/api.php`.
 
-### 2. Audit Trial (`notification_sent_log`)
-- **`notification_type`**: The category string.
-- **`entity_type` / `entity_id`**: Polymorphic link to the source record (e.g. `Order:123`).
-- **Unique Constraint**: `unq_notif_sent_log` prevents duplicate notifications for the same event-entity pair during retry cycles.
+This document focuses on the **tenant** feature; platform routes are listed for orientation only.
 
-## Key Technical Workflows
+## Tenant route entry point
 
-### The Notification Pipeline
-1. A Domain Event is triggered.
-2. The `NotificationManager` resolves the recipient's `preferences`.
-3. If enabled for the target vector (Email/Push), the system generates a `NotificationJob`.
-4. The job logs the attempt in `notification_sent_log` before calling the external provider (SendGrid/Firebase).
+| File | Prefix |
+|------|--------|
+| `backend/routes/tenant_dashboard/notification.php` | `/api/tenant/notifications` |
 
-## Performance & Scaling
-- **Asynchronous**: 100% of external notifications (Email/Push) are processed in the background queue.
-- **Index Optimization**: `unq_notif_sent_log` facilitates rapid $O(1)$ deduplication checks before dispatch.
+Registered inside the same authenticated `tenant` route group as other dashboard APIs (`backend/routes/api.php`).
 
-## Tenancy & Security
-- **PII Scrubbing**: Logs never store the actual content of the email/message (Passwords, Tokens). They only store the fact that a message was sent.
-- **Isolation**: Preferences are strictly scoped; a student's settings in one tenant have no effect on their settings in another.
+| Method | Path | Handler |
+|--------|------|---------|
+| `GET` | `/notifications` | `NotificationController::index` — paginated list; supports `unread_only` (see `ListNotificationsRequest`) |
+| `GET` | `/notifications/unread-count` | `NotificationController::unreadCount` |
+| `POST` | `/notifications/{id}/read` | `NotificationController::markRead` |
+| `POST` | `/notifications/read-all` | `NotificationController::markAllRead` |
+| `GET` | `/notifications/preferences` | `TenantNotificationPreferenceController::index` |
+| `PUT` | `/notifications/preferences` | `TenantNotificationPreferenceController::update` — batch update via `UpdateNotificationPreferencesUseCase` |
+
+**Canonical base URL:** `https://{host}/api/tenant/notifications` — mirrored in `frontend/config/api-endpoints.ts` as **`TENANT_NOTIFICATIONS`**.
+
+## Data model (tenant DB)
+
+| Migration | Artifact |
+|-----------|----------|
+| `2026_03_14_101112_create_notifications_table.php` | **`notifications`** — `notifiable_type` / `notifiable_id`, `tenant_id`, `type`, `category`, `title`, `body`, `data` (JSON), `action_url`, `read_at`, email send/fail timestamps |
+| `2026_03_14_101525_create_notification_preferences_table.php` | **`notification_preferences`** — polymorphic `preferable_type` / `preferable_id`, `category`, `channel`, `enabled`; unique `(preferable_type, preferable_id, category, channel)` |
+| `2026_03_14_101546_create_notification_sent_log_table.php` | **`notification_sent_log`** — dedup key `unq_notif_sent_log` on `(notification_type, entity_type, entity_id)` (later migrations may extend columns) |
+
+An older **`tenant_notifications`** migration exists; the **tenant inbox API** queries the **`notifications`** table via `NotificationRecord` (`App\Infrastructure\Database\Models\NotificationRecord`), scoped by `TenantContext` and `notifiable_id` = current user.
+
+## Application layer (examples)
+
+- **Preferences:** `ListNotificationPreferencesQuery`, `UpdateNotificationPreferencesUseCase` (`App\Application\Shared\Notification\`)
+- **Email delivery:** `SendNotificationEmailJob` (`ShouldQueue`) — used by multiple domain use cases (enrollment, waitlist, course notices, etc.)
+- **In-app persistence:** Domain/application services create rows consumers read through `NotificationController`
+
+## Platform admin notifications (reference)
+
+Under `Route::prefix('platform')` + `auth:admin_api` (see `api.php`):
+
+- `GET /api/platform/notifications`, `unread-count`, `POST .../read`, `read-all`, preferences — **not** the same codebase path as tenant routes; different controllers (`AdminNotificationController`).
+
+## Scheduling
+
+`backend/routes/console.php`:
+
+- `notifications:cleanup` — daily `02:20`
+- `notifications:process-overages` — every 15 minutes
+- `notifications:retry-failed` — hourly
+- `notifications:preaggregate-unread` — every 15 minutes
 
 ---
 
-## Linked References
-- Related Modules: `User`, `CommunicationHub`.
+## Linked references
+
+- **Tenant context** — `TenantContext` scopes inbox queries
+- **Other domains** — course, enrollment, waitlist, etc. emit notifications via application services and jobs

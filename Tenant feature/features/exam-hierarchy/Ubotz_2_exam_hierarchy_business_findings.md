@@ -1,17 +1,21 @@
 # UBOTZ 2.0 Exam Hierarchy Business Findings
 
 ## Executive Summary
-For LMS tenants acting as test-preparation academies (e.g., JEE, UPSC, IELTS), categorizing a course simply as "Math" is insufficient. The `Exam Hierarchy` feature supports the rigidly defined syllabus architectures mandatory in these B2B verticals.
 
-## The 4-Tier Syllabus Matrix
-Administrators and Instructors must map all assessment material through an explicit pipeline, locking educational assets to a concrete position:
+The **exam hierarchy** gives test-prep and academic tenants a **standard syllabus spine**—**exam**, **subject**, **chapter**, **topic**—so courses, quizzes, and the **question bank** can share one taxonomy. This is separate from **course categories**, which exist for **merchandising** and navigation.
 
-1. **Exam:** E.g., "JEE Main 2026"
-2. **Subject:** E.g., "Physics"
-3. **Chapter:** E.g., "Kinematics"
-4. **Topic:** E.g., "Projectile Motion"
+Product teams use the hierarchy to drive **analytics** (“weak topics”) and **content alignment** with real-world exams.
 
-## Commercial Implications
-By enforcing this taxonomy across both **Courses** and the **Question Bank**, the platform guarantees profound post-examination analytics. When a mock test completes, the hierarchy allows the dashboard to explicitly calculate and report: "Student X is ranking 85th percentile in Kinematics (Chapter) but 22nd percentile in Projectile Motion (Topic)". 
+---
 
-Without enforcing the 4-tier Exam Hierarchy binding on assignments and quizzes, deep subject-matter diagnostics—a massive commercial selling point—are impossible.
+## Administration
+
+- **Exams** can be created, updated, and deleted (subject to downstream FK usage) via tenant APIs with **`exam.manage`**.
+- **Lower levels** (subjects, chapters, topics) are exposed as **list** endpoints in the current API surface for **selection** and **filtering**; confirm roadmap if full CRUD for every level is required in-app.
+
+---
+
+## Linked references
+
+- **Technical specification:** `Ubotz_2_exam_hierarchy_technical_documentation.md`.
+- **Related:** Courses (`exam_id`, `subject_id`, `chapter_id`, `topic_id` on `courses`), **quiz / question bank** indexes, batches/categories where linked to exams.

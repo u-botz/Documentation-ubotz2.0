@@ -1,26 +1,41 @@
-# UBOTZ 2.0 Lead Management Business Findings
+# UBOTZ 2.0 — Lead Management — Business Findings
 
-## Executive Summary
-The Lead Management module is the primary B2B CRM engine for Ubotz 2.0 tenants. It governs the top-of-funnel acquisition process, allowing institutions to capture enquiries from landing pages, track staff follow-ups, and automate the conversion of prospects into enrolled students.
+## Executive summary
 
-## Operational Modalities
+Lead management is the tenant’s CRM for enquiries and counseling. Institutions capture prospects (including from public web properties), organize them in a pipeline, assign staff, record notes and follow-ups, score and prioritize leads, and optionally use WhatsApp and marketing source analytics. Duplicate detection and merge workflows reduce conflicting records; CRM reports support funnel and counselor performance insight.
 
-### 1. Capture & Pipelines
-- **Automated Capture**: Leads are primarily spawned from the `Landing-Page` enquire forms (`lead_source: landing_page`).
-- **Pipeline Stages**: Leads transition through a defined lifecycle (e.g., `new_enquiry` $\rightarrow$ `follow_up` $\rightarrow$ `converted`).
-- **Staff Assignment**: Administrators assign leads to specific staff members (`assigned_staff_id`) to ensure accountability and follow-up consistency.
+## How leads enter the system
 
-### 2. Follow-up & Integrity
-- **Lead Notes**: Every interaction (phone call, email) is recorded in `lead_notes` to maintain a unified institutional memory of the prospect's history.
-- **Duplicate Protection**: The system employs a "Dedup" engine (`lead_duplicate_candidates`) based on normalized phone numbers and emails to prevent multiple staff members from competing for the same student.
+- **Public forms:** Throttled public endpoints submit leads against a **tenant slug** (`POST /api/public/tenants/{tenantSlug}/leads`). This supports landing-page and marketing capture without tenant-admin login.
+- **Visit tracking:** A separate public endpoint records visits for a known lead id where applicable.
+- **Manual entry:** Authorized staff create and edit leads in the tenant dashboard (`lead_management.manage`).
 
-### 3. Conversion
-- When a lead settles their first payment or manually enrolls, the `is_converted` flag is toggled. This creates a permanent link between the marketing acquisition cost and the final student identity, enabling precise ROI reporting.
+## Day-to-day operations
 
-## Branch Scoping
-Leads are tagged with a `branch_id`. This ensures that a "Delhi Campus" staff member only sees leads interested in their local center, preventing cross-branch lead poaching and data leaks.
+- **Pipeline and ownership:** Leads move through stages; staff assignment clarifies responsibility. Stage changes and assignments are auditable via activities.
+- **Notes and follow-ups:** Notes document conversations; follow-ups and follow-up tasks schedule next actions. Permissions split **view** vs **manage** for follow-up work.
+- **Conversion:** Converting a lead is a dedicated business action (admission-oriented), not merely a flag change; admission fee can be tied to analytics where the source-analytics module and roles allow it.
+- **Temperature / scoring:** Configurable scoring and temperature help prioritize outreach; scheduled score recalculation keeps lists current.
+
+## Optional modules
+
+- **WhatsApp:** When the WhatsApp module is enabled, tenants can connect Meta/WhatsApp, manage templates, use inbox and broadcasts, and message individual leads subject to capability checks.
+- **Source analytics and spend:** Marketing spend and ROI views require the source-analytics module; admission fee updates on leads sit behind the same product boundary.
+- **CRM reports:** Funnel, velocity, branch comparison, counselor views, and exports are gated by report capabilities and the CRM reports module.
+- **Duplicate handling:** Dedup surfaces candidate pairs; merge and dismiss operations require explicit merge permission.
+
+## Branch and tenancy
+
+Leads are tenant-isolated. Branch fields (where present in data model) support organizing enquiries by campus or region for routing and reporting.
+
+## Compliance and safety
+
+Public submission endpoints are rate-limited. Sensitive integrations (WhatsApp, spend data) are capability- and module-gated so small teams do not accidentally expose or change financial or messaging configuration.
 
 ---
 
-## Linked References
-- Related Modules: `User`, `Landing-Page`, `Payment`, `CommunicationHub`.
+## Linked references
+
+- **Landing page / public website** — discovery and contact flows
+- **Users & roles** — who can view vs manage CRM objects
+- **Platform** — landing page *templates* are curated separately; tenants consume templates in the website builder

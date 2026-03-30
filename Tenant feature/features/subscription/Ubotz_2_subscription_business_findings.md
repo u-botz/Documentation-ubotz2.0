@@ -1,31 +1,25 @@
-# UBOTZ 2.0 Subscription Business Findings
+# UBOTZ 2.0 — Subscription — Business Findings
 
-## Executive Summary
-Subscriptions govern the relationship between the Ubotz Platform (Landlord) and the Tenant (Tenant). It is the primary engine for B2B revenue and resource governance, defining the plan tiers, usage limits, and billing cycles for every institution on the platform.
+## Executive summary
 
-## Operational Modalities
+In the **tenant** product, **subscription plans** are **institution-defined offers**: duration (**days**), optional **use limits**, and **pricing in cents**, used to package access (for example a “3-month test series pass”). Staff with **`subscription.manage`** maintain the catalog; enrolling a learner onto a plan typically requires **`subscription.enroll`** as well.
 
-### 1. Plan Catalog (`subscription_plans`)
-Managed by the Platform administrators in the Central DB.
-- **Tiers**: Standard tiers (Starter, Professional, Enterprise) with fixed capabilities.
-- **Limits**: Hard constraints on `max_users`, `max_courses`, and `max_storage_bytes`.
-- **Billing Cycles**: Supporting `monthly` and `annual` billing with significant discounts for annual commitments.
+## Not platform billing
 
-### 2. Tenant Lifecycles
-Subscriptions track the full journey of a tenant institution:
-- **Trial**: Initial period with temporary access to higher-tier features.
-- **Active**: Regular paying state.
-- **Past Due**: Temporary grace state after a failed payment.
-- **Expired/Cancelled**: Suspension of service and potential locking of the tenant dashboard.
+Do **not** confuse this with the **tenant organization’s own contract** with UBOTZ (plans, invoices, suspension for non-payment). That is **platform** operations and is documented under platform subscription and billing flows.
 
-### 3. Entitlements & Overrides
-- **Module Entitlements**: Specific functional blocks (e.g., "Lead Management", "CBT Quizzes") can be toggled per plan.
-- **Overrides**: Platform administrators can grant manual overrides for specific tenants (`module_entitlement_overrides`) for pilots or bespoke enterprise agreements.
+## Operations
 
-## Revenue Protection
-Through integration with payment gateways (Stripe/Razorpay), the platform handles automatic renewals and seat-overage tracking. When a tenant exceeds their `max_users` limit, the system can automatically trigger overage billing or block further student registration.
+- **Plans** — Create, update, retire, or delete institution offerings subject to business rules in the use cases.
+- **Enrollment** — Assign a **student** to a **plan** so entitlements apply for the configured period or usage cap.
+
+## Governance
+
+Capabilities split **who can design plans** from **who can attach students**, reducing accidental mass enrollments by junior staff when policy requires it.
 
 ---
 
-## Linked References
-- Related Modules: `Tenant-Provisioning`, `Payment`.
+## Linked references
+
+- **Payment** — when students pay for a priced plan
+- **Users** — who receives the subscription

@@ -1,31 +1,46 @@
-# UBOTZ 2.0 User Technical Specification
+# UBOTZ 2.0 — User (tenant directory) — Technical Specification
 
-## Core Architecture
-Users are the primary entities within the `TenantAdminDashboard\User` bounded context. They are persisted in the tenant-specific database but are rigorously scoped to ensure platform-wide data integrity.
+## Scope
 
-## Relational Schema Constraints (`users`)
-Derived from the `2026_02_22_000001_create_users_table.php` schema:
+CRUD and extended profile for **users inside a tenant** (students, instructors, admins): export, verification, impersonation hooks, financial toggles, subscription enrollments, education/experience/occupations, extended profile. Routes: `backend/routes/tenant_dashboard/users.php` → **`/api/tenant/users`**.
 
-| Column | Technical Significance |
-| :--- | :--- |
-| **`tenant_id`** | **CRITICAL:** Foundational isolation key. Every query MUST apply this scope via `BelongsToTenant`. |
-| **`email`** | Unique only when combined with `tenant_id` (`unq_users_email_tenant`). |
-| **`token_version`** | Int-based versioning for JWT/Session invalidation. Incrementing this immediately logs the user out globally. |
-| **`status`** | Enforced at the `Auth` middleware layer. Non-active statuses (e.g., `invited`, `locked`) block session instantiation. |
+## Capabilities
 
-## Extended Schemas
-The User module is augmented by several sub-tables for rich profiles:
-- `user_education_records` / `user_experience_records`
-- `user_occupations`
-- `user_branch_assignments`: Links users to the physical `Branch` context.
+From `TenantCapabilitySeeder`:
 
-## Performance & Security
-- **Indices**: `idx_users_tenant_status` ensures rapid filtering for dashboard user listings.
-- **Audit**: `last_login_ip` and `last_login_at` provide a baseline security trail for tenant administrators.
-- **Force Reset**: `force_password_reset` boolean is checked during the login handshake to redirect users to the password update flow.
+| Capability | Typical routes |
+|------------|----------------|
+| `user.view` | List, stats, show, export, subscriptions index, education/experience/occupations read |
+| `user.manage` | Create, update, toggle status, soft delete, verify, hard delete, impersonate, accept instructor request, financial patches, subscription grant/revoke, profile writes |
+
+**Note:** `user.invite` exists in the seeder; this file uses **`user.manage`** for several admin actions—align product docs with actual route middleware.
+
+## HTTP map (summary)
+
+Under `Route::prefix('users')`:
+
+| Area | Examples |
+|------|----------|
+| Core | `GET/POST /users`, `GET/PUT/PATCH/DELETE /users/{id}`, `GET /export`, `GET /stats` |
+| Safety | `PATCH .../toggle-status`, `PATCH .../verify`, `DELETE .../permanent` |
+| Support | `POST .../impersonate`, `POST .../instructor-requests/accept` |
+| Financial | `PATCH .../cashback-toggle`, `.../registration-bonus/disable`, `.../installment-approval` |
+| Subscriptions | `GET/POST /users/{id}/subscriptions`, `DELETE .../subscriptions/{enrollmentId}` |
+| Profile satellites | `.../education`, `.../experience`, `.../occupations`, `PUT .../extended-profile` |
+
+Controllers live under `App\Http\TenantAdminDashboard\User\` and `App\Http\Controllers\Api\TenantAdminDashboard\User\`.
+
+## Persistence (tenant)
+
+`users` and related tables (e.g. education/experience) live in the **tenant** database; `tenant_id` + unique email per tenant are standard invariants—see migrations such as `2026_02_22_000001_create_users_table.php` and follow-ups.
+
+## Frontend
+
+`frontend/config/api-endpoints.ts` — **`TENANT_USER`** aggregates many of the paths above (including instructor requests and extended profile URLs used by the SPA).
 
 ---
 
-## Linked References
-- Multi-Tenancy Invariants: See `Backend Architecture Master § 5.1`.
-- Related Modules: `Role`, `Tenant-Provisioning`.
+## Linked references
+
+- **Roles** — `user_role_assignments` determines effective capabilities
+- **Tenant provisioning** — creates the initial owner user on the platform side

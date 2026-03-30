@@ -1,9 +1,21 @@
 # UBOTZ 2.0 Branch Business Findings
 
 ## Executive Summary
-The Branch feature supports localized, real-world deployment of the Ubotz LMS. For B2B tenants with multi-city or multi-campus offline institutions, Branches ensure that staff and physical assets can be tagged to a specific local administrative silo.
 
-## Operational Modalities
-- **Logistical Tagging**: Supports basic CRM tracking components like `code`, `email`, `phone`, and `address`. This surfaces immediately when registering students to specific intake centers.
-- **Deactivation Protocol**: Branches are not permanently destroyed down the dependency chain if they close. The `is_active` toggle acts as a business-logic halt, ensuring historical attendance or enrollment records tied to that physical branch are not rendered obsolete.
-- **Conflict Prevention**: Through strict internal code validation (`DEL-01`), administrators cannot unintentionally spawn duplicated local centers.
+**Branches** let a single tenant represent **multiple physical locations or logical units** under one account. Each branch has a **stable code** (unique per tenant), contact fields, an **active** flag, and optional **branch manager**. Users can be **assigned** to branches for access and reporting.
+
+Branches also act as a **dimension** on leads, fees, and payments where configured, so finance and CRM views can compare performance **by branch**.
+
+---
+
+## Operations
+
+- **Activation:** `is_active` plus the **`deactivate`** API support turning a site off without deleting historical rows tied to that branch.
+- **People:** `user_branch_assignments` models which users belong to which branch(es).
+- **Plans:** Subscription **plan features** can cap **`max_branches`**, aligning commercial limits with footprint.
+
+---
+
+## Linked references
+
+- **Technical specification:** `Ubotz_2_branch_technical_documentation.md` (routes, schema, integrations).

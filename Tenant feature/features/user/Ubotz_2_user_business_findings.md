@@ -1,28 +1,24 @@
-# UBOTZ 2.0 User Business Findings
+# UBOTZ 2.0 — User — Business Findings
 
-## Executive Summary
-The User entity is the fundamental actor within the Ubotz 2.0 ecosystem. It represents students, instructors, and administrative staff. Users are strictly siloed within their respective Tenants, ensuring that a professional or student's interaction remains private and isolated to the institution they belong to.
+## Executive summary
 
-## Operational Modalities
+The **tenant user directory** is the institution’s roster: learners, faculty, and administrators. Emails are unique **within** the tenant, so the same person could theoretically exist on two different institutions without collision. Profiles can include **education**, **experience**, and **occupation** data for verification or display; **financial** flags and **subscription** grants support fee and access policies.
 
-### 1. Identity & Profile
-- **Core Identity**: Basic information including names, email, and phone.
-- **Extended Profile**: Support for detailed academic and professional history (Education, Experience, Occupations) used primarily for instructor verification and student record-keeping.
-- **Financial Flags**: Tracks internal billing states and creditworthiness for fee-based interactions.
+## Roles vs users
 
-### 2. Status & Lifecycle
-- **Invited**: Initial state when an administrator creates a user or a teacher signup is pending.
-- **Active**: Fully verified and authorized user.
-- **Locked**: Safety mechanism triggered by failed login attempts or administrative suspension to prevent unauthorized access.
+**Roles** (RBAC) answer “what may they do?”; **user records** answer “who are they?”. Assignment of roles to users is a separate concern (see Role feature).
 
-### 3. Authentication Policy
-- **Force Password Reset**: New users or those with compromised accounts can be forced to reset their passwords on their next login.
-- **Audit Trail**: Every user record tracks the `last_login_at` and `last_login_ip`, satisfying security compliance for B2B institutions.
+## Lifecycle
 
-## Multi-Tenant Isolation
-User emails are unique **per tenant**. This allows a user to potentially exist on multiple Ubotz tenants using the same email address without account collisions, as their identity is always qualified by the `tenant_id`.
+Administrators **invite or create** users, **activate** or **suspend** them, and in controlled cases **verify** or **hard-delete** records. **Impersonation** (where permitted) helps support staff reproduce issues safely under audit policy.
+
+## Multi-entity profile
+
+Splitting **education**, **experience**, and **occupations** allows structured CV-style data instead of a single blob—useful for instructor vetting and compliance.
 
 ---
 
-## Linked References
-- Related Modules: `Role`, `User-Group`, `Attendance`.
+## Linked references
+
+- **User groups** — segmentation beyond roles
+- **Subscription (tenant LMS)** — granting plan access per user

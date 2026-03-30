@@ -1,27 +1,33 @@
-# UBOTZ 2.0 Notification System Business Findings
+# UBOTZ 2.0 — Notifications — Business Findings
 
-## Executive Summary
-The Notification module is the platform’s proactive engagement engine. It manages the delivery of critical alerts—such as payment receipts, quiz results, and login security warnings—across multiple delivery vectors while respecting the individual preferences of every user.
+## Executive summary
 
-## Operational Modalities
+Notifications keep users informed inside the product (**in-app inbox**) and, where the implementation dispatches them, by **email**. Each user can tune **preferences** by category and channel (for example turning off email for a class of alerts). Platform operators have a **separate** notification center from tenant users.
 
-### 1. Delivery Vectors
-The platform supports a 3-way notification strategy:
-- **In-App (Real-time)**: Notifications delivered via WebSockets/PubSub directly to the student dashboard.
-- **Email**: Formal documentation for receipts and certificates.
-- **Push**: Mobile-first alerts for session reminders and announcements.
+## Tenant experience
 
-### 2. User Preferences
-Every user (Student/Staff) has a `notification_preferences` dashboard where they can granularly toggle specific types of alerts. For example, a student might want Email for "Payment Receipts" but only In-App for "Daily Rewards".
+- **Inbox** — Users see a paginated list, can filter unread-only, fetch an unread badge count, mark one or all as read.
+- **Preferences** — Users update which **categories** are enabled per **channel** (the exact categories and channels are those supported by the product and validation in `UpdateNotificationPreferencesRequest` / use case).
+- **Isolation** — Queries are scoped to the **current tenant** and **current user** so one institution never sees another’s notifications.
 
-### 3. Auditing & Safety
-- **Sent Log**: Every notification event is recorded in the `notification_sent_log`. This is crucial for dispute resolution (e.g., proving that a "Payment Overdue" notice was indeed sent).
-- **Rate Limiting**: Prevents "Alert Fatigue" by capping the number of non-critical messages a user receives within a specific timeframe.
+## Platform vs tenant
 
-## RTL & Localization
-Modern notification templates support RTL (Right-to-Left) layouts (notably for Arabic-speaking tenants), ensuring institutional branding remains professional across all markets.
+- **Tenant APIs** serve institution staff and students authenticated on the tenant realm.
+- **Platform APIs** serve UBOTZ operators with admin credentials. They are separate products from a security and UX perspective.
+
+## Delivery expectations
+
+- **In-app** records are durable rows users can revisit.
+- **Email** (when used) is typically **queued** (`SendNotificationEmailJob`) so HTTP requests stay fast; failures can be tracked on the notification row where columns exist.
+- **Operational jobs** clean up, retry failures, and maintain aggregates on a schedule—supporting scale without manual database hygiene.
+
+## Relation to “Communication”
+
+Automated notifications complement ad-hoc messaging elsewhere: they are often **event-driven** (enrollment, waitlist, notices) rather than free-form chat.
 
 ---
 
-## Linked References
-- Related Modules: `User`, `Payment`, `CommunicationHub`.
+## Linked references
+
+- **User & auth** — who receives which notifications
+- **Courses / enrollment / waitlist** — common sources of automated messages

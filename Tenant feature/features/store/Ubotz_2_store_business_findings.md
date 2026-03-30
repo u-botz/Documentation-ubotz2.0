@@ -1,27 +1,27 @@
-# UBOTZ 2.0 Store Business Findings
+# UBOTZ 2.0 — Store — Business Findings
 
-## Executive Summary
-The Store module provides Ubotz 2.0 tenants with a full digital marketplace (E-commerce). It allows institutions to sell non-course assets, such as "Mock Test PDFs", "Physical Textbooks", or "Merchandise", directly to their student base.
+## Executive summary
 
-## Operational Modalities
+The **store** lets a tenant sell **catalog items** that are not necessarily framed as “courses”: merchandise, materials, or digital goods, with **localized** titles/descriptions and **inventory** controls for physical stock. **Orders** can move through operational steps such as **shipping** and **delivery confirmation** where the product type requires it.
 
-### 1. Product Catalog
-- **Product Types**: Supports both `digital` (instant download) and `physical` (requiring shipping) assets.
-- **Translations**: Every product supports multi-lingual metadata (Title, Description, SEO Summary) to cater to global student audiences.
+## Catalog
 
-### 2. Inventory Management
-- **`inventory`**: Tracks stock levels for physical goods.
-- **`inventory_warning`**: Triggers administrative alerts when a product is running low, ensuring fulfillment continuity.
-- **UNLIMITED Flag**: Used for digital assets (PDFs, recorded seminars) where inventory is infinite.
+- **Types** — Products carry a `type` string (implementation-defined) to distinguish digital vs physical or other behaviors.
+- **Translations** — Multiple locales per product support international student bodies.
+- **Pricing** — Base price and optional delivery fee are tracked in **cents** for precision.
 
-### 3. Sales & Fulfillment
-- **`price_cents` / `delivery_fee_cents`**: Clear separation of product cost vs. logistical overhead.
-- **Fulfillment Status**: Tracks the movement from `DRAFT` (prep) $\rightarrow$ `ACTIVE` (live) $\rightarrow$ fulfillment.
+## Inventory and fulfillment
 
-## Commercial Integration
-The Store is fully integrated with the platform's Payment engine. Successful purchases of digital products automatically grant the student access to the associated files in their "My Downloads" section.
+- **Stock** — Finite inventory with optional **low-stock** warnings; **unlimited** inventory suits digital goods.
+- **Orders** — Staff list and inspect orders; fulfillment actions align with shipping workflows rather than only “paid” flags.
+
+## Tenancy
+
+All catalog and order data is **scoped to the institution**; another tenant never sees products or orders from a peer.
 
 ---
 
-## Linked References
-- Related Modules: `Payment`, `File-Manager`.
+## Linked references
+
+- **Payment** — customer payment for store purchases
+- **File manager** — digital asset delivery when wired to product files

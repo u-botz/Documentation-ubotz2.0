@@ -1,16 +1,36 @@
-# UBOTZ 2.0 Landing Page Business Findings
+# UBOTZ 2.0 — Landing Page / Tenant Website — Business Findings
 
-## Executive Summary
-For the UBOTZ Tenant, the Landing Page acts as the digital storefront and initial point of sales acquisition. B2B operators leverage landing pages to rapidly construct marketing funnels, inject bespoke branding, and govern SEO footprints for their explicitly published competitive exam arrays or B2C catalog offerings.
+## Executive summary
 
-## Operational Modalities
+The tenant **website** product lets an institution present a public marketing site: branded landing pages from approved **templates**, optional custom pages, navigation, theme, SEO-oriented settings, and embedded content such as courses and blog. Publishing controls when the public site shows a page. Platform operators maintain the **template catalog**; tenants **select** templates and customize content within policy.
 
-### Global Templating
-- **`template_id`**: Tenants are shielded from coding HTML. They inherit structural blueprints (Templates) curated by the **Platform Root/Super Admins**. 
+## Who does what
 
-### JSON Styling & Analytics Configs
-- Tenants control visual variables (Color palettes, Logos, Hero text bounds) through intuitive backend forms parameterized directly into `branding`.
-- **Acquisition Hooks**: The `seo_config` dynamically drives meta descriptions, Open Graph (OG) shares for social networks, and integrates vital marketing tools (Facebook Pixels, Google Tag Manager scripts).
+- **Platform (Super Admin)** — Creates and governs **landing page templates** (quality, lifecycle, approval). Tenants do not edit platform template source in production flows.
+- **Tenant (Owner / Admin with website permissions)** — Chooses templates, edits page metadata and sections, uploads media, configures navigation and global theme/display options, and publishes or unpublishes. Capabilities are split between **view** (`landing_page.view`) and **manage** (`landing_page.manage`), with the **website module** enabled for the subscription.
 
-### Publication State
-- Deployments operate via standard state cycles (`draft` $\rightarrow$ `published`). Subdomains map instantly to `published` layouts. Nullifying or pulling down the page enforces maintenance mode or internal redirects logic without requiring server-side Apache/Nginx DNS restarts.
+## Visitor experience
+
+- Anonymous visitors consume **`/api/public/tenants/{tenantSlug}/website/...`** endpoints: navigation, theme, pages, courses, blog, stats, contact form, and domain-check helpers.
+- **Course checkout** uses a dedicated authenticated checkout route where the product requires a logged-in tenant user session.
+
+## Custom pages
+
+Beyond template-driven landing pages, tenants can maintain **custom pages** with their own publish lifecycle, suitable for policies, static information, or campaign URLs.
+
+## Marketing and CRM
+
+- Contact forms on the public site feed **lead capture** (see Lead Management).
+- SEO and branding JSON support institutional marketing without code deploys.
+
+## Custom domains
+
+Tenants may connect a custom hostname subject to verification flows documented with the custom-domain feature; the public website API exposes helpers for the frontend to resolve branding and routing.
+
+---
+
+## Linked references
+
+- **Lead management** — enquiry pipeline from public capture
+- **Courses / blog** — content surfaced on the public website
+- **Subscriptions / modules** — `module.website` gates tenant builder features

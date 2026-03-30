@@ -1,68 +1,73 @@
-# UBOTZ 2.0 Quiz Technical Specification
+# UBOTZ 2.0 — Quiz — Technical Specification
 
-## 1. Domain-Driven Design Context
+## Scope
 
-The Quiz feature resides within the `TenantAdminDashboard\Quiz` bounded context. Adhering to the DDD invariants of the Ubotz platform, Eloquent Models are sequestered entirely inside `Infrastructure\Persistence`, while the Domain layer maintains pure PHP entities.
+Assessment lifecycle: authoring (`quizzes`, questions, sections), student attempts/results, analytics, and grading queues. Bounded context: `TenantAdminDashboard\Quiz`. Routes: `backend/routes/tenant_dashboard/quiz.php`.
 
-### Core Domain Entities
-- **`QuizEntity`**: Root aggregate for the assessment. Contains business rules for status transitions, scoring boundaries, and access validations.
-- **`QuestionBankEntity`**: Base item representing an isolated question pool record independently of any quiz attachment.
-- **`QuizQuestionEntity` / `QuizQuestionOptionEntity`**: Represent the structural composition of a quiz payload.
-- **`QuizSectionEntity`**: Manages logical groupings (e.g., "Physics", "Chemistry") utilized fundamentally in `mock_test` variants.
-- **`QuizResultEntity`**: Captures scoring states, grading pipelines, and final resolution.
+## Module and capabilities
+
+- **Module:** `tenant.module:module.exams` wraps all routes in this file.
+
+| Capability | Used for (representative) |
+|------------|---------------------------|
+| `quiz.view` | List/detail/stats, question-type entitlements, access-check, results, analytics, grading queue read |
+| `quiz.create` | Create quiz, duplicate |
+| `quiz.edit` | Update quiz, questions, sections, reorder, enroll student, grade, bulk grade, reassign grading |
+| `quiz.publish` | Status transitions, close quiz |
+| `quiz.archive` | Archive (delete route) |
+
+**Student surface** (`/api/tenant/student/quizzes/...`) has **no** `tenant.capability` middleware in the route file; enforcement is in controllers/use cases (enrollment, access rules).
+
+## HTTP map (base `/api/tenant`)
+
+### Student (`/student/quizzes`)
+
+| Method | Path |
+|--------|------|
+| GET | `/student/quizzes` — catalog |
+| GET | `/student/quizzes/{quizId}` |
+| POST | `/student/quizzes/{quizId}/start` |
+| GET | `/student/quizzes/{quizId}/attempt/{resultId}` |
+| POST | `/student/quizzes/{quizId}/attempt/{resultId}/submit` |
+| GET | `/student/quizzes/{quizId}/result/{resultId}` |
+| GET | `/student/quizzes/{quizId}/leaderboard` |
+
+### Admin/instructor (`/quizzes`)
+
+- Read: `GET /quizzes/stats`, `/quizzes`, `/quizzes/question-type-entitlements`, `/quizzes/{quizId}`, `/quizzes/{quizId}/access-check`
+- Write: create, update, `PATCH .../status`, duplicate, delete (archive), close, enroll
+- Questions: `/quizzes/{quizId}/questions` CRUD + `POST .../reorder`
+- Results: `/quizzes/{quizId}/results`, `/quizzes/{quizId}/results/{resultId}`, `POST .../grade`
+- Analytics: `/quizzes/{quizId}/analytics/summary|questions|trends|students`
+- Sections: `/quizzes/{quizId}/sections` CRUD + `PATCH .../reorder`
+- Grading queue: `GET .../grading-queue`, `POST .../grade/{responseId}`, `POST .../grade-bulk/{questionId}`, `POST .../reassign-grading`
+
+## Application use cases (examples)
+
+Under `App\Application\TenantAdminDashboard\Quiz\UseCases\`:
+
+- Lifecycle: `CreateQuizUseCase`, `UpdateQuizUseCase`, `DuplicateQuizUseCase`, `ChangeQuizStatusUseCase`, `ArchiveQuizUseCase`, `CloseQuizUseCase`, `EnrollStudentInQuizUseCase`
+- Sections/questions: `CreateQuizSectionUseCase`, `UpdateQuizSectionUseCase`, `DeleteQuizSectionUseCase`, `ReorderQuizSectionsUseCase`, `CreateQuizQuestionUseCase`, `UpdateQuizQuestionUseCase`, `DeleteQuizQuestionUseCase`, `ReorderQuizQuestionsUseCase`
+- Attempts: `CheckQuizAccessUseCase`, `StartQuizAttemptUseCase`, `SubmitQuizAnswersUseCase`
+- Grading: `GradeQuizResultUseCase`, `GradeQuizResponseUseCase`, `BulkGradeByQuestionUseCase`, `CompleteGradingUseCase`, `ReassignGradingUseCase`
+- Question bank bridge: `AddQuestionFromBankUseCase`, `ImportQuestionBankUseCase` (bank import)
+
+## Persistence (tenant — representative)
+
+| Migration | Purpose |
+|-----------|---------|
+| `2026_03_03_000001_create_quizzes_table.php` | Core `quizzes` — `quiz_type` (`practice_quiz` \| `mock_test` \| `pyq`), `status`, access/scoring/CBT/display fields, JSON `sections` |
+| `2026_03_03_000002_create_quiz_questions_table.php`, `2026_03_03_000003_create_quiz_question_options_table.php` | Inline questions |
+| `2026_03_21_180C_000001_create_quiz_sections_table.php` | `quiz_sections` (structured sections) |
+| `2026_03_08_034947_create_quiz_results_table.php` + later migrations | Attempts/results/responses |
+
+## Frontend
+
+`frontend/config/api-endpoints.ts` → **`TENANT_QUIZ`** (admin quiz paths). Student quiz paths may be called directly from feature code (e.g. `/api/tenant/student/quizzes/...`).
 
 ---
 
-## 2. Infrastructure & Database Schema
+## Linked references
 
-The foundational data store for the module is the `quizzes` table (`2026_03_03_000001_create_quizzes_table.php`).
-
-### Critical Schema Attributes
-| Category | Columns | Significance |
-| :--- | :--- | :--- |
-| **Multi-Tenancy** | `tenant_id` | **CRITICAL:** Enforced via `BelongsToTenant` trait boundary. All queries MUST scope against this index. |
-| **Hierarchy Binding** | `exam_id`, `subject_id`, `course_id` | Foreign keys resolving to the tenant application scope, dictating module dependencies. |
-| **Access Control** | `access_level`, `is_free`, `max_attempts` | Validated constantly at the API gate to determine if a payload can be instantiated for an actor. |
-| **Scoring Meta** | `pass_mark`, `negative_marking`, `total_mark` | Applied inside the `GradeQuizResponseUseCase` orchestration. |
-| **CBT Flags** | `enable_cbt_mode`, `enable_mark_for_review`, `enable_question_palette` | Front-end drivers for dynamically rendering exam UI layouts. |
-
-> **Note:** The `sections` attribute utilizes a `json` column, accommodating flexible nested mappings for Mock Test structures without necessitating expensive cross-table joins during test initiation.
-
----
-
-## 3. Application UseCases Overview
-
-The `Application\TenantAdminDashboard\Quiz\UseCases` namespace organizes tasks by single responsibility:
-
-### Instantiation & Management
-- `CreateQuizUseCase` / `UpdateQuizUseCase`
-- `DuplicateQuizUseCase`: Deeply clones quiz structural trees including sections and question mappings.
-- `ChangeQuizStatusUseCase`: Dictates transitions through the `draft` $\rightarrow$ `active` $\rightarrow$ `archived` state machine.
-
-### Question Handling
-- `ImportQuestionBankUseCase`: Handles bulk ingestion methodologies.
-- `AddQuestionFromBankUseCase`: Safely binds bank references to a live `QuizEntity`.
-- `ReorderQuizQuestionsUseCase` / `ReorderQuizSectionsUseCase`: Mutates array order parameters for fixed-display quizzes.
-
-### Execution & Grading
-- `CheckQuizAccessUseCase`: Pre-flight mechanism evaluating `max_attempts`, enrollment records, and active dates.
-- `StartQuizAttemptUseCase`: Initializes tracker records and issues test payloads.
-- `SubmitQuizAnswersUseCase`: Ingests and serializes student responses securely.
-- `GradeQuizResponseUseCase` / `BulkGradeByQuestionUseCase`: Computation engines for objective score allocations and human-grading orchestrations.
-
----
-
-## 4. Security & Multi-Tenancy Invariants
-
-> [!WARNING]
-> The Quiz Domain operates **exclusively in the tenant context**. Under no circumstances should cross-tenant global scopes be bypassed using `withoutGlobalScope()`.
-
-1. **Authorization Boundaries:** Controller endpoints are guarded strictly by capabilities (`quiz.create`, `quiz.edit`, `quiz.publish`, `quiz.view`). 
-2. **Access Isolation:** Student roles attempting to leverage `StartQuizAttemptUseCase` must pass stringent checks authenticating active parent `course_id` enrollments (if `access_level` is `course_only`).
-3. **Database Guardrails:** Every query issued from `Infrastructure\Persistence\TenantAdminDashboard\Quiz\Repositories` injects `$tenantId` inherently or via Global Scope.
-
----
-
-## 5. Linked References
-- Status report: `../../status reports/Quiz_Status_Report.md`
-- Consolidated feature doc: `../../feature documents/Ubotz_2_quiz_feature_documentation.md`
+- **Question bank** — reusable items and `bank_question_id` on quiz questions
+- **Exam hierarchy** — `exam_id` / `subject_id` linkage on quizzes

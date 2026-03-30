@@ -1,62 +1,33 @@
-# UBOTZ 2.0 Quiz Business Findings & Requirements
+# UBOTZ 2.0 — Quiz — Business Findings
 
-## Executive Summary
-The Quiz feature is a foundational assessment engine for UBotz 2.0 tenants. It is designed to evaluate student comprehension through flexible structures ranging from low-stakes practice quizzes to high-stakes, exam-simulating mock tests. The module is fully isolated per tenant and provides powerful monetization and access control levers to administrators and instructors.
+## Executive summary
 
----
+Quizzes let a tenant deliver **practice**, **mock-test**, and **previous-year** style assessments with configurable access (course-only, standalone, or both), scoring (including negative marking where enabled), and optional **CBT-style** UX (palette, mark-for-review). Staff author content, monitor **results and analytics**, and work **manual grading** queues when questions are not fully auto-scored.
 
-## 1. Assessment Types & CBT Simulation
-The platform supports distinct modalities for quizzes to align with various pedagogical and business goals:
+## Assessment shapes
 
-- **Practice Quizzes (`practice_quiz`)**: Standard assessments typically attached to course material for continuous evaluation.
-- **Mock Tests (`mock_test`)**: Architected to simulate real-world entrance examinations (e.g., JEE, NEET). 
-- **Previous Year Questions (`pyq`)**: Archives of past examinations, primarily used as a monetization or lead-generation tool.
+- **Quiz types** — Modeled in data as `practice_quiz`, `mock_test`, or `pyq`, driving expectations for layout and rigor.
+- **Sections** — Supported via dedicated section entities/migrations for multi-part exams; legacy JSON `sections` on `quizzes` may still exist for older rows.
+- **Question bank** — Items can be pulled from the bank to avoid duplicating content across many quizzes.
 
-### Computer-Based Testing (CBT) Simulation
-For tenants catering to competitive exam preparation, the system provides strict CBT configurations that mimic actual testing environments. Toggling CBT mode enables features such as:
-- A real-time **Question Palette** showing answered, unanswered, and "marked for review" statuses.
-- **Mark for Review** capabilities, allowing users to bookmark difficult questions and resolve them later in the session.
-- **Sectional Summaries**, providing macro-level insights before final submission.
+## Access and monetization
 
----
+- **Access level** — `course_only`, `standalone`, or `both` controls whether enrollment in a parent course is required or the quiz can be sold or listed independently (subject to product rules).
+- **Free vs paid** — `is_free` distinguishes complimentary vs paid experiences where pricing is wired.
 
-## 2. Monetization & Access Models
+## Student journey
 
-The quiz engine is tightly integrated with the platform's commercial strategy, offering flexible access boundaries.
+Students browse available quizzes, **start** an attempt, submit answers, view **results** (per product rules), and may see a **leaderboard** when enabled.
 
-### Access Levels (`access_level`)
-- **Course Only (`course_only`)**: The quiz is strictly bound to a specific course. Only students with an active enrollment in the parent course can access it.
-- **Standalone (`standalone`)**: The quiz exists independently of courses. It can be sold as a distinct product or offered directly to registered users.
-- **Hybrid (`both`)**: The quiz serves both course-enrolled students and independent purchasers.
+## Staff operations
 
-### Pricing Mechanism
-- **Free vs. Paid (`is_free`)**: Quizzes can be offered at no cost (excellent for lead generation or introductory material) or locked behind the tenant's payment gateway.
+- **Publish / close / archive** — Govern lifecycle without deleting historical attempts where soft-archive is used.
+- **Analytics** — Summary, per-question breakdown, trends, and student insights support instructional decisions.
+- **Grading** — Objective items grade automatically; subjective or complex items flow through grading actions and bulk tools.
 
 ---
 
-## 3. Operations & Question Management
+## Linked references
 
-### The Question Bank
-To maximize instructor efficiency, the platform utilizes a robust, centralized **Question Bank**.
-- Instructors can import questions in bulk, tag them with metadata (subject, topic, chapter), and reuse them across multiple quizzes.
-- Reusing questions ensures parity when analyzing difficulty metrics across different cohorts over time.
-
-### Quiz Construction
-Quizzes are built linearly or organized into **Sections** (critical for Mock Tests mirroring standard exam formats).
-- **Randomization:** Instructors can shuffle question order (`display_questions_randomly`) or cap the total questions displayed from a much larger pool (`display_limited_questions`).
-- **Scheduling:** Quizzes operate strictly within a defined validity window (`access_starts_at` and `expiry_days`) while actively tracking attempts against the `max_attempts` ceiling.
-
----
-
-## 4. Evaluation & Grading Strategies
-
-The business supports complex grading configurations to mirror rigorous academic standards:
-- **Automated Grading:** For objective question types (MCQs), the platform computes scores instantly upon submission based on `default_mcq_grade` and `pass_mark` thresholds.
-- **Negative Marking:** For competitive exam simulations, the system calculates exact penalties utilizing the `negative_marking` penalty coefficients.
-- **Manual Evaluation Workflows:** For subjective responses, workflows exist to assign human graders, process items via a `BulkGradeByQuestion` pipeline, and execute a formalized `CompleteGrading` sign-off.
-
----
-
-## 5. Linked References
-- Status report: `../../status reports/Quiz_Status_Report.md`
-- Original feature doc: `../../feature documents/Ubotz_2_quiz_feature_documentation.md`
+- **Question bank** — authoring reuse
+- **Course / enrollment** — access for `course_only` and enroll flows

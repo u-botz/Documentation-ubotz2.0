@@ -1,34 +1,50 @@
-# UBOTZ 2.0 Reward System Technical Specification
+# UBOTZ 2.0 — Reward — Technical Specification
 
-## Core Architecture
-The Reward module handles event-driven point allocation (`TenantAdminDashboard\Reward`). It utilizes a ledger-based "Double Entry" design for data integrity.
+## Scope
 
-## Relational Schema Constraints
+Per-tenant **reward configuration** (points per event type) and an append-only **ledger** of point movements. Optional domain events when points are awarded. Routes: `backend/routes/tenant_dashboard/reward.php`.
 
-### 1. Configuration (`reward_configs`)
-- **`tenant_id`**: isolation key.
-- **`type`**: The event category (e.g., `quiz_completion`).
-- **`unique(['tenant_id', 'type'])`**: Prevents duplicate point-allocation rules for the same event category.
+## Module
 
-### 2. Ledger Tracking (`reward_ledger`)
-- **`points`**: Integer value (can be negative for redemptions or claw-backs).
-- **`source_type` / `source_id`**: Polymorphic relationship pointers to the event that triggered the reward.
-- **Indices**: `idx_reward_ledger_tenant_user` optimizes the calculation of the student's current total balance.
+- **`tenant.module:module.rewards`** gates the entire file.
 
-## Key Technical Workflows
+**Capabilities:** The route file does **not** attach `tenant.capability:*`; only authenticated tenant context and module entitlement apply. Tighten with policies if product requires admin-only config.
 
-### The Reward Listener
-1. A Domain Event (e.g., `QuizCompletedEvent`) is fired.
-2. The `AllocatePointsListener` checks if any `reward_configs` exist for the given `type`.
-3. If active, it calculates the points and creates an entry in `reward_ledger`.
+## HTTP map (base `/api/tenant`)
 
-### Balance Calculation
-Instead of storing a `total_points` column on the `users` table (which is prone to desynchronization), the system computes balances on-demand or uses a materialized cache derived from the `reward_ledger` totals.
+| Method | Path | Controller |
+|--------|------|--------------|
+| GET | `/rewards/configs` | `RewardConfigController::index` |
+| PUT | `/rewards/configs/{type}` | `RewardConfigController::update` — `{type}` is the reward type string |
+| GET | `/rewards/history` | `RewardLedgerController::index` — current user’s ledger |
+| GET | `/rewards/balance` | `RewardLedgerController::balance` — aggregated balance |
 
-## Tenancy & Security
-The `reward_ledger` is strictly siloed. `fk_reward_ledger_tenants` ensures that points cannot be "Injected" into one tenant from another's dashboard events. Deleting a tenant (`onDelete: cascade`) wipes all associated ledger history.
+`RewardConfigController` resolves `tenant_id` from `X-Tenant-Id` header or `auth('tenant_api')->user()->tenant_id`.
+
+## Application layer
+
+| Component | Role |
+|-----------|------|
+| `AwardRewardPointsUseCase` | Loads config by `RewardType`, skips inactive/zero; **idempotent** per `(tenant, user, source_type, source_id)`; persists `RewardLedgerEntity`; dispatches `RewardPointsAwarded` |
+| `RewardConfigRepositoryInterface` / `RewardLedgerRepositoryInterface` | Persistence |
+
+## Persistence (tenant)
+
+`backend/database/migrations/tenant/2026_03_17_110009_create_reward_tables.php`
+
+| Table | Notes |
+|-------|--------|
+| `reward_configs` | `tenant_id`, `type`, `points`, `is_active`; **unique** `(tenant_id, type)` |
+| `reward_ledger` | `tenant_id`, `user_id`, signed `points`, `source_type`, `source_id`, `description`, `created_at`; indexes on `(tenant_id, user_id)` and `(source_type, source_id)` |
+
+Balance is derived from ledger sums (see `getBalance` in repository).
+
+## Frontend
+
+No dedicated block in `api-endpoints.ts` at the time of writing; use the paths above or add constants alongside other tenant features.
 
 ---
 
-## Linked References
-- Related Modules: `Quiz`, `User`.
+## Linked references
+
+- **Quiz** — common source events for awarding points (callers invoke `AwardRewardPointsUseCase` where integrated)

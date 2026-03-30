@@ -145,16 +145,34 @@ Central path constants: `frontend/config/api-endpoints.ts` — e.g. `TENANT.COUR
 | My courses / browse / learning | `frontend/features/student/courses/*` — `my-courses-page`, `browse-courses-page`, `learning-page`, purchase flows |
 | App routes | e.g. `frontend/app/student-dashboard/courses/[id]/page.tsx` |
 
+### 5.4 Course-scoped communication (not the institution Hub)
+
+Per-course **FAQ**, **forum**, and **noticeboard** are mounted under the same **`/api/tenant/communication`** prefix but separate **modules**: `module.faq`, `module.forum`, `module.noticeboard` (see `backend/routes/tenant_dashboard/communication.php`). Tables include **`course_faqs`**, **`course_forum_topics`**, **`course_forum_answers`**, **`course_noticeboards`**, **`course_noticeboard_reads`** (`2026_03_05_190000_create_communication_tables.php`).
+
+**Frontend:** `frontend/config/api-endpoints.ts` — `TENANT_COMMUNICATION` (`COURSE_FAQS`, `COURSE_FORUM`, `COURSE_NOTICEBOARDS`, etc.). Do not confuse this with **`module.communication_hub`** broadcast messages (`communication_messages`).
+
 ---
 
-## 6. Performance & indexing
+## 6. Public catalog (unauthenticated)
+
+Marketing / catalog JSON for a tenant website:
+
+- `GET /api/public/tenants/{tenantSlug}/website/courses`
+- `GET /api/public/tenants/{tenantSlug}/website/courses/{courseSlug}`
+- `GET /api/public/tenants/{tenantSlug}/website/courses/{courseSlug}/curriculum`
+
+See `PublicCourseController` in `backend/routes/api.php` (throttled public group).
+
+---
+
+## 7. Performance & indexing
 
 - Tenant-scoped composite indexes on course-related tables (e.g. `idx_courses_tenant_status`, `idx_learnings_tenant_user_course`) match high-frequency list and progress queries.
 - Review aggregates: implementation may use caching or aggregated fields; confirm in read models / resources for a given endpoint before assuming materialized views.
 
 ---
 
-## 7. Linked code references
+## 8. Linked code references
 
 | Layer | Path |
 |-------|------|
@@ -166,6 +184,7 @@ Central path constants: `frontend/config/api-endpoints.ts` — e.g. `TENANT.COUR
 
 ---
 
-## 8. Document history
+## 9. Document history
 
 - Original draft referenced middleware/use-case names not present in the repository; **§4** and **§2** were aligned with migrations and PHP classes as of the last review.
+- Added **§5.4** (course FAQ/forum/noticeboard vs Communication Hub), **§6** (public catalog routes), and renumbered subsequent sections.

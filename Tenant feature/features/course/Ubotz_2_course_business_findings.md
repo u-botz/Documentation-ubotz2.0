@@ -17,6 +17,7 @@ Courses are organized into a logical, multi-tier structure to facilitate structu
 ### 2. Student Progress & Engagement
 - **Learning Tracking**: The system maintains a per-student ledger of completed lessons and files (`course_learnings`), allowing students to resume their progress across multiple sessions. Last-view metadata supports resuming within a course.
 - **Reviews & Feedback**: Students submit structured feedback via `course_reviews` (multi-axis scores such as content quality and instructor skills, plus an overall average and optional text). Moderation status controls what appears publicly. These metrics can feed landing-page and catalog experiences for social proof.
+- **Course communication**: Optional **FAQ**, **forum**, and **noticeboard** features attach to individual courses (separate from the tenant-wide **Communication Hub** broadcasts). Enablement is module-based; see the technical specification **§5.4**.
 
 ## Operational & Commercial Modalities
 

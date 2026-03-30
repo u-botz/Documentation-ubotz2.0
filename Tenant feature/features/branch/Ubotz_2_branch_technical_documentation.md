@@ -1,14 +1,77 @@
 # UBOTZ 2.0 Branch Technical Specification
 
-## Context & Architectural Goal
-The `Branch` entity sits outside the strict academic context (Courses/Assessments). It functions as the primary spatial boundary delineating physical operations or logical subsidiaries inside a singular Tenant.
+Branches are tenant-scoped **sites / campuses** (or logical subsidiaries) used for addressing, assignment of users, and downstream linkage to CRM, fees, installments, payments, and leads. Persistence uses Eloquent records with **`BelongsToTenant`**; HTTP controllers live under `App\Http\Controllers\Api\TenantAdminDashboard\Branch`.
 
-## Schema Map (`branches`)
-Derived from the `2026_03_17_210500_create_branches_table.php` invariant:
-- **`tenant_id`**: Universal isolation boundary. Enforced structurally.
-- **`code`**: A string identifying the branch (e.g., "DEL-01"). Uniquely indexed composite constraint: `unq_branches_tenant_code(tenant_id, code)`.
-- **State Properties**: Uses a simplistic `is_active` boolean integer instead of formal `softDeletes()`. 
-- **Performance Boundary**: Covered by `idx_branches_tenant_active`.
+---
 
-## Policy & Tenancy
-Queries fetching or mutating `Branch` objects must conform to `BelongsToTenant` scope traits to prevent offline-center information from leaking across parallel tenants on the central platform. Support APIs rely intrinsically on `tenant_id` cascading.
+## 1. HTTP surface
+
+Routes: `backend/routes/tenant_dashboard/branch.php` → **`/api/tenant/branches`** (included from `backend/routes/api.php` in the tenant group).
+
+| Method | Path | Capability |
+|--------|------|------------|
+| `GET` | `/` | `branch.view` |
+| `GET` | `/{branchId}` | `branch.view` |
+| `POST` | `/` | `branch.manage` |
+| `PUT` | `/{branchId}` | `branch.manage` |
+| `PATCH` | `/{branchId}/deactivate` | `branch.manage` |
+| `POST` | `/assign-user` | `branch.manage` |
+
+---
+
+## 2. Relational schema (tenant DB)
+
+### 2.1 `branches`
+
+Migration: `2026_03_17_210500_create_branches_table.php`.
+
+| Column | Role |
+|--------|------|
+| `tenant_id` | FK `fk_branches_tenant` |
+| `name`, `code` | Display and natural key; **`unique(tenant_id, code)`** as `unq_branches_tenant_code` |
+| `address`, `phone`, `email` | Contact / location |
+| `is_active` | `tinyInteger` default `1` (not Laravel `softDeletes` on this table) |
+| `timestamps` | Audit |
+
+Index: `idx_branches_tenant_active` on `(tenant_id, is_active)`.
+
+### 2.2 `manager_user_id`
+
+Migration: `2026_03_25_120003_add_manager_user_id_to_branches_table.php` — optional FK to `users` (`fk_branches_manager_user`, `set null` on delete).
+
+### 2.3 `user_branch_assignments`
+
+Migration: `2026_03_17_210501_create_user_branch_assignments_table.php` — links users to branches (`tenant_id`, `user_id`, `branch_id`), unique triple `unq_user_branch`.
+
+### 2.4 Downstream references
+
+Later migrations add **`branch_id`** to leads, installment orders, payment transactions, and fee-related tables (see `2026_03_17_210502_*`, `2026_03_26_20000*`); branches act as an optional dimension across reporting and money flows.
+
+---
+
+## 3. Application layer
+
+Use cases are wired from `BranchReadController` / `BranchWriteController` (see `backend/app/Application/TenantAdminDashboard/Branch/` if present) — list/show, create/update, deactivate, and user assignment.
+
+---
+
+## 4. Frontend & integrations
+
+- No dedicated **`/api/tenant/branches`** client module was found under `frontend/services` at documentation time; branch context appears in **dashboard** (`tenant-dashboard-service` overview `branch_id`), **CRM** reports (`crmReportsApi` branch comparison), **fees**, **WhatsApp**, and **subscription plan limits** (`max_branches`). Treat **`branch.php`** as the contract for new UI.
+
+---
+
+## 5. Linked code references
+
+| Layer | Path |
+|-------|------|
+| HTTP | `backend/app/Http/Controllers/Api/TenantAdminDashboard/Branch/` |
+| Routes | `backend/routes/tenant_dashboard/branch.php` |
+| Migrations | `backend/database/migrations/tenant/2026_03_17_210500_create_branches_table.php` (+ follow-ups) |
+
+---
+
+## 6. Document history
+
+- Confirmed **`is_active`** as `tinyInteger` and documented **`manager_user_id`** and **`user_branch_assignments`**.
+- Replaced vague “offline-center” wording with **route- and schema-accurate** descriptions.

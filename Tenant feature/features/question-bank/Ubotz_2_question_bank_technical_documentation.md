@@ -1,52 +1,62 @@
-# UBOTZ 2.0 Question Bank Technical Specification
+# UBOTZ 2.0 — Question Bank — Technical Specification
 
-## 1. Context & Architectural Placement
+## Scope
 
-The Question Bank is fundamentally interwoven into the `TenantAdminDashboard\Quiz` Bounded Context. However, `QuestionBankEntity` serves as its own aggregate root, reflecting the fact that bank items exist autonomously outside the lifecycle of any specific `QuizEntity`.
+Reusable quiz items stored in **`question_bank`**, authored or imported once and attached to quizzes via **`AddQuestionFromBankUseCase`**. Routes live in `backend/routes/tenant_dashboard/question_bank.php`; application code under `App\Application\TenantAdminDashboard\Quiz\`.
 
-### Core Application UseCases
-The Application Layer coordinates via the `app/Application/TenantAdminDashboard/Quiz` namespace:
-- `CreateQuestionBankItemUseCase`: Handles atomic authoring of a single entity.
-- `ImportQuestionBankUseCase`: Crucial infrastructure orchestrating the ingestion of CSV/JSON files, enforcing validation against `subject_id` and `exam_id` bindings recursively.
-- `UpdateQuestionBankItemUseCase`: Mutates repository records but relies on events to signal updates to any parent quizzes that may be actively cloning these parameters.
-- `ChangeQuestionBankItemStatusUseCase`: Enforces moderation workflow (e.g. promoting `draft` $\rightarrow$ `published`).
-- `AddQuestionFromBankUseCase`: Acts as the bridge context, importing a referenced `QuestionBankEntity` into a `QuizQuestionEntity`.
+## Route entry point
+
+| File | Prefix (effective) |
+|------|---------------------|
+| `backend/routes/tenant_dashboard/question_bank.php` | `/api/tenant` |
+
+| Method | Path | Capability |
+|--------|------|------------|
+| GET | `/question-bank` | `quiz_bank.view` |
+| GET | `/question-bank/{id}` | `quiz_bank.view` |
+| POST | `/question-bank` | `quiz_bank.create` |
+| PUT | `/question-bank/{id}` | `quiz_bank.edit` |
+| PATCH | `/question-bank/{id}/status` | `quiz_bank.edit` |
+| POST | `/question-bank/{id}/add-to-quiz` | `quiz_bank.view` |
+| POST | `/question-bank/import` | `quiz_bank.create` |
+
+Controllers: `QuestionBankReadController`, `QuestionBankWriteController`, `QuestionBankImportController` under `App\Http\Controllers\TenantAdminDashboard\Quiz\`.
+
+## Capabilities (seeded)
+
+From `TenantCapabilitySeeder`: **`quiz_bank.view`**, **`quiz_bank.create`**, **`quiz_bank.edit`**.
+
+## Application use cases
+
+| Use case | Role |
+|----------|------|
+| `CreateQuestionBankItemUseCase` | Create bank item |
+| `UpdateQuestionBankItemUseCase` | Update content; archived items are immutable |
+| `ChangeQuestionBankItemStatusUseCase` | Status workflow (includes **archived**) |
+| `ImportQuestionBankUseCase` | Bulk import via `QuestionBankImportParserInterface` |
+| `AddQuestionFromBankUseCase` | Copy bank item into a quiz; **requires published bank item** (`QuestionBankItemNotPublishedException` if not) |
+
+Queries: `ListQuestionBankQuery`, `GetQuestionBankItemQuery`, `QuestionBankListCriteria`.
+
+## Persistence (tenant)
+
+`backend/database/migrations/tenant/2026_03_21_180B_000001_create_question_bank_table.php` → table **`question_bank`**:
+
+- `tenant_id`, `created_by`, `exam_id`, `subject_id`, optional `chapter_id` / `topic_id`
+- `type`, `difficulty_level`, `title`, optional `image_url` / `video_url`, `correct_explanation`
+- `grade`, optional `correct_numerical_value`
+- `status` (default `published` in migration default string)
+- `timestamps`, **`softDeletes`**
+- Indexes: `idx_qbank_tenant`, `idx_qbank_tenant_status`, `idx_qbank_hierarchy`, `idx_qbank_type_difficulty`
+
+## Security
+
+- All queries must respect **tenant isolation** (repository / global scope patterns used elsewhere in Quiz).
+- Route middleware maps **capabilities** above—not `quiz.create` / `question_bank.manage` (those names are not what the seeder uses).
 
 ---
 
-## 2. Infrastructure & Schema (`question_bank`)
+## Linked references
 
-The fundamental data structure resides in the `question_bank` table (`2026_03_21_180B_000001_create_question_bank_table.php`).
-
-### Critical Indices and Schema Constraints
-| Field Context | Column Name | Technical Significance |
-| :--- | :--- | :--- |
-| **Tenancy Enforcement** | `tenant_id` | **CRITICAL:** Constrained structurally by `idx_qbank_tenant`. Prevents cross-tenant asset leaking using the standard global scope. |
-| **Performance Identifiers** | `exam_id`, `subject_id`, `chapter_id`, `topic_id` | Enforced collectively by the composite `idx_qbank_hierarchy` index. This guarantees efficient $O(log N)$ filtration during bulk-quiz auto-generation and analytics matrix mapping. |
-| **Algorithmic Profiling** | `type`, `difficulty_level` | Supported by the `idx_qbank_type_difficulty` index. It accelerates dynamic pulling of queries (e.g., "Give me 10 *hard* *MCQs*"). |
-| **Rendering Media** | `image_url`, `video_url` | Character-limited (`500`) to point to the tenant's segmented S3 objects. Not utilized for base64 embeddings directly into DB payloads. |
-
----
-
-## 3. Data Invariants and Field Semantics
-
-### Evaluation & Parsing Fields
-- **`correct_numerical_value`:** Defined as `decimal(15, 4)`. This strictly accommodates CBT "Integer/Decimal Type" evaluation endpoints where regex string matching is inadequate for mathematical tolerance parsing.
-- **`grade`:** Represents the baseline positive score increment `decimal(8, 2)`.
-- **`correct_explanation`:** Rich text string sent exclusively as a post-submission payload during the `QuizResultEntity` rendering step.
-
-### State Transitions
-The core `status` column employs string mappings instead of boolean checks:
-1. `draft`: Incomplete or awaiting subject-matter-expert (SME) approval.
-2. `published`: Synced and ready to be loaded via `AddQuestionFromBankUseCase`.
-
----
-
-## 4. Security Models
-
-> [!WARNING]
-> Question Bank assets are strictly partitioned. 
-
-1. **Global Isolation:** Eloquent's `BelongsToTenant` scope asserts `$table->where('tenant_id', currentTenant())`. There are no scenarios where 'Platform Admins' pull records generically across boundaries.
-2. **Access Middleware:** Creating and mutating bank items are protected by explicit policies validating `quiz.create` and `question_bank.manage` capabilities attached to the authenticated actor's `user_role_assignments`.
-3. **Soft Deletions:** Managed through `$table->softDeletes()`. Due to the high relational coupling with legacy quizzes and previous student attempt analytics (`QuizResultEntity`), strict database row deletion is disabled via standard Eloquent traits.
+- **Quiz** — attempts, grading, and in-quiz questions under `routes/tenant_dashboard/quiz.php`
+- **Exam hierarchy** — `exam_id` / `subject_id` linkage

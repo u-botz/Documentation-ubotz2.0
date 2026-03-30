@@ -1,26 +1,28 @@
-# UBOTZ 2.0 Role Business Findings
+# UBOTZ 2.0 — Role — Business Findings
 
-## Executive Summary
-The Role module implements a robust Role-Based Access Control (RBAC) system. It allows Tenant administrators to define exactly what each user can see and do within the platform, from high-level "Owner" access to granular "Instructor" or "Staff" permissions.
+## Executive summary
 
-## Operational Modalities
+**Roles** bundle **capabilities** (fine-grained permissions) so institutions can mirror real staff structure: owners and admins manage **roles**, while instructors, students, and custom roles receive only what they need. **System roles** protect core workflows; **custom roles** extend the model when the product allows creation.
 
-### 1. Capability-Based Authorization
-Unlike rigid, hard-coded roles, Ubotz roles are collections of **Capabilities**.
-- **Examples**: `quiz.create`, `payment.view`, `attendance.mark`.
-- This allows for flexible staff structures where a "Branch Manager" might have payment viewing rights while a "Teacher" is restricted only to academic content.
+## Capabilities vs roles
 
-### 2. System vs. Custom Roles
-- **System Roles**: Pre-defined templates (Owner, Admin, Instructor, Student) that ensure core platform workflows remain intact.
-- **Custom Roles**: (Optional/Enterprise) Allows tenants to create bespoke definitions like "Librarian" or "Junior Accountant" by selecting specific capability bundles.
+- A **role** is a named set of allowed actions (`quiz.edit`, `role.manage`, etc.).
+- A **user** receives one or more role assignments; effective access is the union of capabilities on those roles, subject to middleware and any hierarchy rules enforced in use cases.
 
-### 3. Hierarchy & Governance
-Roles follow a hierarchy that prevents lower-level staff (e.g., an Instructor) from modifying higher-level settings (e.g., Tenant Billing) even if they were inadvertently granted a conflicting capability.
+## Administration
 
-## Staff Role Expansion
-Recent updates have expanded the "Staff" role capabilities, especially for Lead Management and CRM functions, allowing localized branch staff to handle the entire lead-to-enrollment funnel.
+- Viewing roles and the capability catalog requires **`role.view`**.
+- Creating, editing, deleting, and toggling roles requires **`role.manage`**.
+- The API can **filter** which capabilities appear when building a role of a given **type** (staff vs student, etc.), reducing accidental over-permissioning.
+
+## Governance
+
+- **Hierarchy** checks in role mutations prevent lower-privilege actors from elevating others beyond policy.
+- **System roles** may be protected from destructive edits depending on product rules in the use cases.
 
 ---
 
-## Linked References
-- Related Modules: `User`, `Tenant-Provisioning`.
+## Linked references
+
+- **Users** — assignment of roles to people
+- **Audit** — role changes may be logged where the application records admin actions

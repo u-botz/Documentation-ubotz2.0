@@ -1,43 +1,60 @@
-# UBOTZ 2.0 Payment Technical Specification
+# UBOTZ 2.0 — Payment (Tenant LMS checkout) — Technical Specification
 
-## Core Architecture
-The Payment module is the most technically critical bounded context (`TenantAdminDashboard\Payment`). It manages high-stakes external gateway integrations while ensuring rigorous multi-tenant data isolation and financial integrity.
+## Scope
 
-## Relational Schema Constraints
+This document covers the **tenant payment routes** in `backend/routes/tenant_dashboard/payment.php`: course checkout initialization, payment webhooks, and student invoice read/download. It is **not** the full story for **student fee ledgers**, **offline fee verification**, or **platform (UBOTZ) billing**—those live under other route files (see Linked references).
 
-### 1. Order Layer
-- **`student_orders`**: The central transactional ledger record.
-  - **`total_amount_cents`**: Stored as an integer (cents) to avoid floating-point rounding errors.
-  - **`stripe_payment_intent_id`**: Stores the unique identifier from the external gateway for cross-referencing.
-  - **`idempotency_key`**: Bound unique index `idx_student_orders_idempotency` prevents duplicate order instantiation.
+## Route entry point
 
-### 2. Gateway Settings
-- **`tenant_stripe_settings`**: Stores encrypted gateway credentials (`secret_key_encrypted`, `webhook_secret_encrypted`). These are encrypted at rest using the platform's `APP_KEY`.
+| File | Module gate |
+|------|-------------|
+| `backend/routes/tenant_dashboard/payment.php` | `tenant.module:module.lms` |
 
-### 3. Event Logging & Safety
-- **`student_payment_events`**: Immutable log of every raw payload received from Stripe/Razorpay (`payload` JSON). This allows for post-facto re-processing or auditing if a webhook handler fails.
-- **`payment_transactions`**: Generic ledger table used for non-order-based movements or historical reconciliation.
+Effective base: **`/api/tenant`** (included from `backend/routes/api.php` in the tenant route group).
 
-## Key Technical Workflows
+| Method | Path | Auth | Handler |
+|--------|------|------|---------|
+| `POST` | `/checkout/course` | `auth:api`, `resolve.tenant` | `CheckoutController::initializeCourseCheckout` |
+| `GET` | `/student-invoices/{id}` | same | `StudentInvoiceReadController::show` |
+| `GET` | `/student-invoices/{id}/download` | same | `StudentInvoiceReadController::download` |
+| `POST` | `/webhooks/payment` | *(none — verify in use case)* | `CheckoutController::handleWebhook` |
 
-### The Webhook Pipeline
-1. `WebhookController` receives a raw POST body from Stripe.
-2. The signature is verified using the tenant's `webhook_secret_encrypted`.
-3. The event is persisted to `student_payment_events`.
-4. A background `ProcessStripeEventJob` is dispatched.
-5. The job resolves the `student_order` via the `payment_intent_id` and executes the `MarkOrderAsPaidUseCase`.
+> **Note:** Checkout and invoices use the **`auth:api`** + **`resolve.tenant`** stack from this file, not the default `auth:tenant_api` group middleware. Clients must match whatever guard the API expects for these endpoints.
 
-### Refund Execution
-- **`student_refunds`**: When a refund is requested, the system makes a synchronous API call to the gateway.
-- If the gateway returns success, the status shifts to `succeeded` and the parent order is flagged as `refunded`.
+## Application layer
 
-## Tenancy & Security
-- **Encryption**: sensitive keys are never stored in plaintext (`text` column type, encrypted using Laravel's base encrypter).
-- **Isolation**: Tenant A's webhook endpoint cannot be spoofed to mark Tenant B's orders as paid, as the `webhook_secret` is resolved per-tenant.
-- **Auditing**: `payment_attempt_count` and `failed_at` columns provide defensive diagnostics for troubleshooting checkout failures.
+| Component | Role |
+|-----------|------|
+| `InitializeCheckoutUseCase` | Creates a `PaymentTransaction` (gateway name **`razorpay`** in current code), persists via `PaymentTransactionRepositoryInterface`, returns URL from `PaymentGatewayInterface::generateCheckoutUrl` |
+| `ProcessPaymentWebhookUseCase` | Verifies signature via gateway (`X-Razorpay-Signature`), resolves transaction, idempotent paid handling, dispatches `PaymentCompleted` |
+| `GetStudentInvoiceQuery` | Backs invoice JSON |
+| `StudentInvoicePdfGeneratorInterface` | PDF for download |
+
+Webhook verification and payload parsing are **Razorpay-oriented** in `CheckoutController` / `ProcessPaymentWebhookUseCase` (not Stripe-specific).
+
+## Persistence (tenant — representative)
+
+| Artifact | Notes |
+|----------|--------|
+| `payment_transactions` | Base: `2026_03_05_120000_create_payment_transactions_table.php` — `tenant_id`, `user_id`, `item_type` / `item_id`, `amount_cents`, `currency`, `status`, `gateway_name`, `gateway_transaction_id`, `paid_at`; extended by fee/Razorpay migrations (e.g. `2026_03_21_100001_extend_payment_transactions_for_student_fees.php`) |
+| `tenant_payment_configs` | Per-tenant Razorpay keys (encrypted columns) — `2026_03_21_100000_create_tenant_payment_configs_table.php` |
+| `student_orders` / `tenant_stripe_settings` | Introduced in broader **student billing** migrations (e.g. `2026_03_29_120000_g2_student_billing_tables.php`) — used by other flows; do not assume every checkout path writes here without tracing the use case |
+
+## Related tenant payment surfaces (other files)
+
+- **Fees / offline approval:** `routes/tenant_dashboard/fees.php` — `/api/tenant/fees/offline-payment`, `/api/tenant/payments/pending-verification`, approve/reject
+- **Student-initiated Razorpay flows:** `routes/tenant_dashboard/student_payments.php`
+- **Payment settings UI:** `routes/tenant_dashboard/settings.php` — `/api/tenant/settings/student-payment` (+ verify)
+
+## Frontend
+
+- `frontend/services/tenant-payment-service.ts` posts to **`/checkout/course`** (ensure API base URL includes `/api/tenant` if that is how the client is configured)
 
 ---
 
-## Linked References
-- Status report: `../../status reports/Payment_Status_Report.md`
-- Related Modules: `Fee`, `Installment`, `Enrollment`.
+## Linked references
+
+- **Fees** — ledger, concessions, offline recording
+- **Installment** — installment order payments
+- **Enrollment** — access after successful payment events
+- **CLAUDE.md** — platform Razorpay vs tenant student payment configuration

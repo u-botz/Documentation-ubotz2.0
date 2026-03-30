@@ -1,28 +1,40 @@
-# UBOTZ 2.0 User Group Technical Specification
+# UBOTZ 2.0 — User group — Technical Specification
 
-## Core Architecture
-User Groups are implemented as a light-weight organizational layer in the Tenant database. They utilize a standard many-to-many relationship with the `User` entity.
+## Scope
 
-## Relational Schema Constraints
+Named **segments** of users for targeting (pricing, CRM, communications). Routes: `backend/routes/tenant_dashboard/user_groups.php` → **`/api/tenant/user-groups`**.
 
-### 1. Definition (`user_groups`)
-- **`tenant_id`**: Strict isolation boundary.
-- **`name`**: Unique per tenant (`unique(['tenant_id', 'name'])`).
-- **`status`**: Boolean-like state (`active`, `inactive`) governing group visibility.
+## Capabilities
 
-### 2. Membership (`user_group_members`)
-- Join table linking `user_groups.id` to `users.id`.
-- Enforces an index on `tenant_id` to ensure membership queries remain within the tenant's security boundary.
+| Capability | Routes |
+|------------|--------|
+| `user_group.view` | `GET /user-groups` |
+| `user_group.manage` | `POST /user-groups`, `PUT /user-groups/{id}`, `DELETE /user-groups/{id}`, `POST .../members`, `DELETE .../members/{userId}` |
 
-## Integration Points
-- **Support Tickets**: `ticket_user_groups` maps groups to specific helpdesk visibility.
-- **Marketing**: `special_offer_user_groups` binds groups to pricing concessions and course bundles.
+Controller: `App\Http\TenantAdminDashboard\UserGroup\Controllers\UserGroupController`.
 
-## Performance Invariants
-- **Soft Deletes**: Enabled on the `user_groups` table to prevent catastrophic data loss in cross-referenced modules (like Tickets) if a group is removed.
-- **Tenant Scoping**: All group lookups are filtered through the standard global scope.
+## Application use cases
+
+`App\Application\TenantAdminDashboard\UserGroup\UseCases\`: `ListUserGroupsUseCase`, `CreateUserGroupUseCase`, `UpdateUserGroupUseCase`, `DeleteUserGroupUseCase`, `AddUserGroupMemberUseCase`, `RemoveUserGroupMemberUseCase`.
+
+## Persistence (tenant)
+
+| Migration | Table |
+|-----------|--------|
+| `2026_03_09_162746_create_user_groups_table.php` | **`user_groups`** — `tenant_id`, `name`, `status` (`active`/`inactive`), `created_by`, **unique** `(tenant_id, name)`, **soft deletes** |
+| `2026_03_09_162750_create_user_group_members_table.php` | **`user_group_members`** — membership rows |
+
+## Integration
+
+Other features reference groups via pivot tables such as **`ticket_user_groups`** and **`special_offer_user_groups`** (see pricing migrations).
+
+## Frontend
+
+`frontend/config/api-endpoints.ts` — **`TENANT_USER_GROUPS`**: `/api/tenant/user-groups`.
 
 ---
 
-## Linked References
-- Related Modules: `User`, `CommunicationHub`.
+## Linked references
+
+- **User** — members are tenant users
+- **Pricing** — offers/tickets can target groups

@@ -1,36 +1,48 @@
-# UBOTZ 2.0 Store Technical Specification
+# UBOTZ 2.0 — Store — Technical Specification
 
-## Core Architecture
-The Store module is an e-commerce context (`TenantAdminDashboard\Store`) designed for high-cardinality metadata and inventory precision.
+## Scope
 
-## Relational Schema Constraints
+Tenant **product catalog** (categories, products, translations, media files, FAQs) and **order** listing/fulfillment (ship, confirm delivery). Application layer: `App\Application\TenantAdminDashboard\Store\`. Routes: `backend/routes/tenant_dashboard/store.php`.
 
-### 1. Products (`products`)
-- **`tenant_id`**: Structural isolation key.
-- **`price_cents`**: Integer bigInt for currency safety.
-- **`inventory`**: Signed integer for stock tracking.
-- **Indices**: `idx_products_tenant_status` ensures rapid front-end catalog rendering.
+## Route entry point
 
-### 2. Translations (`product_translations`)
-- Join table for `locale`-based strings.
-- Unique constraint `uq_product_locale` ensures one set of metadata per language per product.
+| File | Prefix (effective) |
+|------|---------------------|
+| `backend/routes/tenant_dashboard/store.php` | `/api/tenant/store` |
 
-## Key Technical Workflows
+The route group does **not** add `tenant.module` or `tenant.capability` middleware in this file; authorization relies on the surrounding **tenant API** middleware (`auth:tenant_api`, etc.) and controller/use-case checks.
 
-### Inventory Lock (Atomic)
-To prevent overselling of high-demand physical products (e.g. limited edition textbooks):
-1. The system uses a pessimistic database lock or an atomic `decrement('inventory')` operation during the checkout flow.
-2. If `inventory` reaches 0 (and `unlimited_inventory` is false), the product is immediately shifted to `OUT_OF_STOCK` for that tenant.
+## HTTP map
 
-### Digital Content Fulfillment
-When a `digital` type product is purchased:
-1. The `ProcessOrderJob` identifies the linked `file_id` in the File Manager.
-2. It grants the student account a permanent access token to the specific asset.
+Nested `Route::prefix('store')->name('store.')`:
 
-## Tenancy & Security
-Isolation is enforced via `tenant_id`. Custom product categories and shipping rules are private to the institutional scope.
+| Area | Pattern | Notes |
+|------|---------|--------|
+| Categories | `apiResource('categories', ProductCategoryController)` | Standard REST |
+| Products | `apiResource('products', ProductController)` + `PUT products/{product}/details`, `PUT products/{product}/inventory` | |
+| FAQs | `apiResource('faqs', ProductFaqController)->except(['index','show'])` | |
+| Files | `apiResource('files', ProductFileController)->except(['index','show'])` | |
+| Orders | `apiResource('orders', ProductOrderController)->only(['index','show'])` + `POST orders/{order}/ship`, `POST orders/{order}/confirm-delivery` | |
+
+## Application use cases (examples)
+
+`App\Application\TenantAdminDashboard\Store\UseCases\`: `CreateProductUseCase`, `UpdateProductDetailsUseCase`, `UpdateProductInventoryUseCase`, `UpdateProductMediaUseCase`, `DeleteProductUseCase`, category/FAQ/file CRUD use cases, `ShipProductOrderUseCase`, `ConfirmOrderDeliveryUseCase`.
+
+## Persistence (tenant)
+
+| Migration | Tables |
+|-----------|--------|
+| `2026_03_09_012332_create_product_category_tables.php` | `product_categories` (+ related if any) |
+| `2026_03_09_012335_create_product_tables.php` | **`products`** — `tenant_id`, `creator_id`, `category_id`, `type`, `slug`, `price_cents`, `delivery_fee_cents`, `unlimited_inventory`, `inventory`, `inventory_warning`, `status`, …; **`product_translations`** — `locale`, `title`, `seo_description`, `summary`, `description`; **unique** `(product_id, locale)` |
+| `2026_03_09_012352_create_product_orders_table.php` | **`product_orders`** |
+
+## Frontend
+
+No dedicated `STORE` block was present in `frontend/config/api-endpoints.ts` at documentation time; clients call `/api/tenant/store/...` paths implied above.
 
 ---
 
-## Linked References
-- Related Modules: `Payment`, `File-Manager`.
+## Linked references
+
+- **Payment** — checkout for store orders (where integrated)
+- **File manager** — assets linked to digital products

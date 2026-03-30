@@ -1,26 +1,36 @@
 # UBOTZ 2.0 Custom Domain Business Findings
 
 ## Executive Summary
-The Custom Domain module provides premium white-labeling capabilities for Ubotz 2.0 tenants. It allows institutions to host their student dashboard and landing pages on their own brand-specific URL (e.g., `learn.oxford.edu`) instead of a generic Ubotz subdomain (`oxford.ubotz.com`).
 
-## Operational Modalities
+**Custom domains** let an institution serve its **public site** and tenant experience from a **branded hostname** (e.g. `learn.institution.org`) instead of only the default tenant subdomain. Tenants register a domain, add **DNS records** (TXT for proof, CNAME/A per platform guidance), and run **verification** until the platform marks the domain ready for **activation**.
 
-### 1. Verification Lifecycle
-To ensure institutional ownership and platform security, domains undergo a multi-step verification process:
-- **`pending_verification`**: Initial entry where the tenant is provided with DNS records (CNAME, TXT, A) to add to their provider.
-- **Verification Deadline**: Standard 72-hour window (`verification_deadline_at`) to complete DNS configuration.
-- **`activated_at`**: Point at which the platform starts routing traffic to the custom URL.
-
-### 2. DNS Integrity
-The system periodically executes a `last_dns_check_at`. If a tenant removes their DNS records or their domain expires, the system records a `dns_failure_detected_at` and may automatically deactivate the custom domain to prevent "Subdomain Takeover" vulnerabilities.
-
-### 3. Deactivation & Removal
-Administrators can suspend custom domains for billing or compliance reasons (`deactivation_reason`), reverting the tenant to their primary Ubotz slug instantly.
-
-## Commercial Value
-Custom Domains are typically the hallmark of Enterprise-tier subscriptions. They provide the institutional trust required for high-ticket professional and academic certifications.
+Operational safeguards include **deadlines**, **DNS failure** timestamps, and **deactivation** / **removal** reasons so support can explain outages or policy actions.
 
 ---
 
-## Linked References
-- Related Modules: `Tenant-Provisioning`, `Subscription`.
+## Verification lifecycle
+
+- **`pending_verification`** — tenant has claimed a hostname and must complete DNS.
+- **`verification_deadline_at`** — business window to finish setup (enforced in product/policy).
+- **`verified_at` / `activated_at`** — progression toward live routing (exact rules in domain services).
+- **Ongoing checks — `last_dns_check_at`** — supports detecting **lapsed DNS** (`dns_failure_detected_at`) to reduce takeover risk if a domain stops pointing at UBOTZ.
+
+---
+
+## Permissions
+
+- **`custom_domain.view`** — read current configuration.
+- **`custom_domain.manage`** — register, verify, remove.
+
+---
+
+## Commercial fit
+
+Custom domains are often bundled with **higher tiers** (enterprise / white-label positioning). Technical enforcement may combine **subscription entitlements** with these APIs — confirm in central plan/module configuration.
+
+---
+
+## Linked references
+
+- **Technical specification:** `Ubotz_2_custom_domain_technical_documentation.md`.
+- **Related:** Tenant provisioning, landing page / public website, subscription plans.

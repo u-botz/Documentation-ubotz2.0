@@ -1,27 +1,30 @@
-# UBOTZ 2.0 Pricing & Special Offer Business Findings
+# UBOTZ 2.0 — Pricing — Business Findings
 
-## Executive Summary
-The Pricing module is the tactical marketing engine of the platform. It allows Ubotz 2.0 tenants to implement complex discount strategies, promotional "Special Offers", and targeted "Coupon Tickets" to drive conversions and reward student loyalty.
+## Executive summary
 
-## Operational Modalities
+**Pricing** in this module means **course-level tickets** (coded discounts with optional capacity and audience limits) and **special offers** (percentage discounts over date ranges). Both are tools to run campaigns and segment audiences without editing base course list prices for every purchaser.
 
-### 1. Special Offers (`special_offers`)
-Global or category-specific discounts (e.g., "30% Off All Physics Courses for Diwali").
-- **Time-bound**: Automated `starts_at` and `ends_at` governance.
-- **Resource Constraints**: Offers can be limited to specific `Courses` or `Bundles`.
+## Tickets
 
-### 2. Discount Tickets (`discount_tickets`)
-Personalized or campaign-specific "Coupon" codes (e.g., `SAVE50`).
-- **Usage Limits**: Tracks `max_uses` vs. `current_uses`. 
-- **User-Specific**: Tickets can be restricted to specific student `User-Groups`, allowing for "Scholarship" or "Early Bird" concessions.
+- Institutions define a **code-like ticket** tied to a course: discount amount, validity window, and optional **capacity** (how many times it can be used).
+- **User groups** can restrict who may apply a ticket or offer, supporting scholarships or member-only campaigns when configured.
 
-### 3. Pricing Rules
-Allows for "Tiered" pricing based on institutional rules (e.g., "Staff children get 50% discount automatically").
+## Special offers
 
-## Revenue Governance
-Every discount applied is linked back to the `Payment` ledger. This ensures that even with aggressive marketing, the institution can maintain precise "Net Revenue" vs "Gross Revenue" auditing.
+- **Percentage** discounts with **start/end** dates and active/inactive status simplify seasonal promotions (e.g. enrollment drives).
+
+## Relationship to checkout
+
+Discounted **net price** at checkout depends on the rest of the product (validation endpoints, cart/order logic). This documentation only establishes **what** tickets and offers are stored and **how** they are administered via APIs.
+
+## Governance
+
+All records are **tenant-scoped** in the data layer; a code created for one institution must never apply to another’s catalog.
 
 ---
 
-## Linked References
-- Related Modules: `Course`, `Bundle`, `Payment`, `User-Group`.
+## Linked references
+
+- **Course** — offers and tickets are per course
+- **Payment** — settlement after a price is agreed
+- **User groups** — targeting for eligibility

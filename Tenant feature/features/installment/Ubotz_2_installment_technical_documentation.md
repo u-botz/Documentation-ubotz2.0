@@ -1,31 +1,104 @@
 # UBOTZ 2.0 Installment Technical Specification
 
-## Core Architecture
-The Installment module resides within the `TenantAdminDashboard\Installment` bounded context. It provides a state-machine-driven interface for managing multi-step payment obligations.
+**Installment plans** define how a student pays for a **course** (or other billable item) over time; **installment orders** instantiate a plan for a user; **installment order payments** track per-step dues and settlement. Application code: `App\Application\TenantAdminDashboard\Installment`.
 
-## Relational Schema Constraints
+---
 
-### 1. Configuration Layer
-- **`installment_plans`**: Root metadata for the plan (title, description, upfront config).
-- **`installment_steps`**: Defines the individual milestones (percentage/amount, due days relative to start).
+## 1. HTTP surface (tenant API)
 
-### 2. Execution Layer
-- **`installment_orders`**: The active instance of a plan attached to a specific student and course.
-- **`installment_order_payments`**: Represents individual payment attempts or partial settlements against an installment step.
-- **`idx_courses_installment_plan`**: (Optional) Courses can define a `default_installment_plan_id`.
+Routes: `backend/routes/tenant_dashboard/installment.php` under **`/api/tenant`**.
 
-## Key Technical Workflows
+| Group | Prefix | Capability |
+|-------|--------|------------|
+| Plans | `installment-plans` | **`installment.manage`** (all endpoints) |
+| Orders | `installment-orders` | **`installment.manage`** |
 
-### Generating Installment Orders
-1. Student selects a course and chooses an installment plan.
-2. `GenerateInstallmentOrderUseCase` calculates the exact `due_at` dates and amounts (cents) based on the plan's `upfront_value` and subsequent `installment_steps`.
-3. An `installment_order` is instantiated, and a `student_order` (type: `installment`) is created for the initial upfront payment.
+### 1.1 Plans
 
-### Processing Payments
-1. When a `student_order` for an installment is marked `paid`, the `UpdateInstallmentOrderPaymentUseCase` is triggered.
-2. The logic marks the specific installment step as `settled` and checks if further blocks on the student's `course_enrollment` should be lifted.
+| Method | Path |
+|--------|------|
+| `GET`, `POST` | `/installment-plans` |
+| `GET`, `PUT`, `DELETE` | `/installment-plans/{plan}` |
+| `POST`, `DELETE` | `/installment-plans/{plan}/steps`, `/installment-plans/{plan}/steps/{step}` |
 
-## Tenancy & Security
-- **Multi-Tenancy**: Every query is strictly scoped against `tenant_id`. 
-- **Integrity**: `installment_order_payments` is tightly coupled to the parent `installment_orders` table via cascading foreign keys, preventing orphaned payment records.
-- **Branch Context**: Installment orders are tagged with `branch_id` for localized financial auditing.
+### 1.2 Orders
+
+| Method | Path |
+|--------|------|
+| `GET`, `POST` | `/installment-orders` |
+| `GET` | `/installment-orders/{order}` |
+| `POST` | `/installment-orders/{order}/approve`, `/cancel` |
+| `POST` | `/installment-orders/{order}/payments` |
+
+**Note:** There is **no** separate read-only capability in this route file — **`installment.manage`** covers all listed routes.
+
+**Student payments:** Installment **step** Razorpay (or similar) flows live under **`/api/tenant/student/payments/installment-step/...`** in `student_payments.php` (see Fee module).
+
+**Frontend:** `frontend/config/api-endpoints.ts` — `TENANT_INSTALLMENT.*` (`PLANS`, `ORDERS`, `ORDER_PAYMENTS`, …).
+
+---
+
+## 2. Relational schema (tenant DB)
+
+### 2.1 `installment_plans`
+
+`2026_03_09_053219_create_installment_plans_table.php`: `tenant_id`, `title`, `description`, `status`, **`upfront_type`** / **`upfront_value`**, `request_verify`, `bypass_verification`, `capacity`, `is_active`.
+
+`2026_03_26_200007_add_late_fee_config_to_installment_plans.php` — late fee configuration on plans.
+
+### 2.2 `installment_steps`
+
+`2026_03_09_053220_create_installment_steps_table.php`: `plan_id`, **`amount_type`** / **`amount_value`**, **`deadline_days`**, `sort_order`.
+
+### 2.3 `installment_orders`
+
+`2026_03_09_053222_create_installment_orders_table.php`: `user_id`, `plan_id`, **`item_type`** / **`item_id`** (polymorphic target), `status`, `total_amount_cents`, `upfront_amount_cents`.
+
+`2026_03_26_200001_add_branch_id_to_installment_orders.php` — **branch** reporting.
+
+### 2.4 `installment_order_payments`
+
+`2026_03_09_053224_create_installment_order_payments_table.php`: `order_id`, `step_id`, `amount_cents`, `due_date`, `status`, `paid_at`.
+
+`2026_03_26_200004_add_partial_payment_to_installment_order_payments.php` — partial payment support.
+
+### 2.5 Defaults on courses/batches
+
+`2026_03_26_200008_add_default_installment_plan_to_courses_and_batches.php` — optional **default plan** on courses and batches.
+
+---
+
+## 3. Application use cases (selected)
+
+| Use case | Role |
+|----------|------|
+| **`CreateInstallmentPlanUseCase`**, **`UpdateInstallmentPlanUseCase`**, **`DeleteInstallmentPlanUseCase`** | Plan CRUD |
+| **`AddInstallmentStepUseCase`**, **`DeleteInstallmentStepUseCase`** | Steps |
+| **`CreateInstallmentOrderUseCase`** | Order creation (replaces older “GenerateInstallmentOrder” naming) |
+| **`ApproveInstallmentVerificationUseCase`**, **`CancelInstallmentOrderUseCase`** | Order lifecycle |
+| **`RecordInstallmentStepPaymentUseCase`** | Payments against order |
+
+Fee domain also includes **`InitiateInstallmentStepPurchaseUseCase`** / **`VerifyInstallmentStepPurchaseUseCase`** for gateway checkout.
+
+---
+
+## 4. Tenancy
+
+All installment entities are **`tenant_id`** scoped; **`branch_id`** on orders supports branch-level finance views.
+
+---
+
+## 5. Linked code references
+
+| Layer | Path |
+|-------|------|
+| Application | `backend/app/Application/TenantAdminDashboard/Installment/` |
+| HTTP | `backend/app/Http/Controllers/Api/TenantAdminDashboard/Installment/` |
+| Routes | `backend/routes/tenant_dashboard/installment.php` |
+
+---
+
+## 6. Document history
+
+- Replaced **`GenerateInstallmentOrderUseCase`** / **`UpdateInstallmentOrderPaymentUseCase`** with **`CreateInstallmentOrderUseCase`** / **`RecordInstallmentStepPaymentUseCase`**.
+- Documented **actual** routes (`installment-plans`, `installment-orders`) and **`installment.manage`** only.

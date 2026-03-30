@@ -1,14 +1,28 @@
 # UBOTZ 2.0 Enrollment Business Findings
 
 ## Executive Summary
-Enrollments are the life-blood metric for the Tenant. They define exactly "who" has active clearance to consume educational material. An Enrollment acts as a digital ticket bridging a student account to a specific `Course`.
 
-## The Acquisition Funnel
-Business operators deploy three explicit methods to grant access:
-1. **Direct Purchase (`source: purchase`)**: Automated pipeline triggered when Stripe/Razorpay issues a successful webhook clearance.
-2. **Subscription (`source: subscription`)**: Granted dynamically based on the student's active platform-level membership status.
-3. **Internal Grant (`source: free`)**: B2B sales leads or scholarship participants patched in manually by tenant administrators.
+A **course enrollment** records that a **student** (user) may access a **course**: **source** (how access was granted), **expiry**, and **status**. The platform uses this row to drive **learning**, **attendance**, and **commerce** reporting. **CheckCourseAccessUseCase** also treats **bundle**, **batch**, and **subscription** entitlements as first-class access paths, not only the single `course_enrollments` row.
 
-## Revocation and Expiry
-- Unlike physical goods, digital enrollments require chronological termination. The `expires_at` property executes this logic implicitly without administrative intervention, safeguarding intellectual property.
-- When an administrator investigates fraud or refunds a purchase, the enrollment enters the `revoked` state, severing application access while preserving the diagnostic trail that the student *was* previously engaged.
+---
+
+## Acquisition paths
+
+- **Self-serve free enroll:** `POST /api/tenant/enrollments/courses/{course}/enroll` for eligible free courses.
+- **Paid / checkout:** Payment and fee flows create or confirm enrollments with appropriate **source** and **idempotency** where implemented.
+- **Admin grant:** Staff assign access with optional **access window** overrides.
+- **Bundle purchase:** Enrolls the student in the bundle and **each** included course (subject to capacity), per **`EnrollStudentInBundleUseCase`**.
+
+---
+
+## Lifecycle
+
+- **Expiry:** `expires_at` ends access when the domain logic evaluates it (with bundle/batch/subscription rules layered on top).
+- **Revocation:** Admin **revoke** marks enrollment ended while retaining history.
+
+---
+
+## Linked references
+
+- **Technical specification:** `Ubotz_2_enrollment_technical_documentation.md`.
+- **Related:** Courses, payments, bundles, batches, subscriptions, **`CheckCourseAccessUseCase`**.

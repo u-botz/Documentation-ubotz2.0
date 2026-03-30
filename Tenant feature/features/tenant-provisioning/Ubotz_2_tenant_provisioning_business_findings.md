@@ -1,32 +1,25 @@
-# UBOTZ 2.0 Tenant Provisioning Business Findings
+# UBOTZ 2.0 — Tenant provisioning — Business Findings
 
-## Executive Summary
-Tenant Provisioning is the technical "Day Zero" workflow for every institution on the platform. It handles the secure creation of isolated data environments, organization-specific identity (subdomains), and the initial administrative account setup.
+## Executive summary
 
-## Operational Modalities
+**Provisioning** is how a **new institution** is registered on UBOTZ: identity (name, slug, domain), **status** in the lifecycle (`pending` → `active` → …), and the **technical steps** that yield an isolated tenant workspace, default roles, and an owner account. **Super Admin** tools expose **status** and **resume** when a run stalls; **idempotency** keys reduce duplicate organizations from double submissions.
 
-### 1. Self-Service Onboarding
-Prospective institutions provide their `slug` (URL prefix) and base organizational details.
-- **Idempotency**: Prevents accidental double-provisioning if the user clicks "Subscribe" multiple times.
-- **Validation**: Checks for slug availability and validates the institutional contact details.
+## Actors
 
-### 2. Infrastructure Setup
-The platform automatically executes the following:
-- Registry entry in the **Central DB**.
-- Subdomain mapping (e.g., `oxford.ubotz.com`).
-- Generation of the initial **Owner** account for the institution.
+- **Platform operators** create or rescue tenants via **platform** APIs (admin JWT, authority tiers).
+- **Self-serve teachers** may use the **teacher signup** funnel, which provisions a tenant with explicit `provisioningSource` tracking.
 
-### 3. Deployment Tiers
-Provisioning supports multiple infrastructure models:
-- **Shared DB (Standard)**: Most tenants share a common database with row-level isolation.
-- **Dedicated DB (Enterprise)**: High-security institutions can be provisioned with a dedicated, isolated database instance during the run.
+## Operations beyond day one
 
-## Lifecycle Management
-Provisioning is not a one-time event but a continuum.
-- **Suspension**: Temporarily locking dashboard access for billing or compliance issues.
-- **Hard Deletion**: Formal GDPR-compliant workflow for scrubbing institutional data from the platform.
+Provisioning is the start of a longer **lifecycle**: suspension, manual payment, infrastructure activation, and hard-delete workflows are separate platform concerns with their own routes and approvals.
+
+## Separation from tenant admin
+
+Day-to-day **users and courses** inside an institution use **`/api/tenant/...`** and tenant RBAC—not this document.
 
 ---
 
-## Linked References
-- Related Modules: `Subscription`, `User`, `Auth`.
+## Linked references
+
+- **Subscription (platform)** — which plan the tenant is on
+- **User / Role (tenant)** — staff and students inside the institution after provisioning

@@ -1,27 +1,26 @@
-# UBOTZ 2.0 Student Analytics Business Findings
+# UBOTZ 2.0 — Student Analytics — Business Findings
 
-## Executive Summary
-Student Analytics provides deep pedagogical insights beyond basic grading. It enables Ubotz 2.0 tenants to understand the "Subject Matter Competency" of their students by weighting different assessments and aggregating performance across the syllabus hierarchy.
+## Executive summary
 
-## Operational Modalities
+**Student analytics** turns activity across assessments and related signals into **cohort and individual insight**: class or **batch** views, per-student history, and **topic-level** mastery. Administrators can tune **dimension weights** so the composite score reflects institutional priorities (for example balancing quizzes vs attendance where the product supports those dimensions).
 
-### 1. Dimension Weighting
-Not all assessments are equal. Administrators can define `analytics_weight_configs` to prioritize specific dimensions:
-- **Assessment Score**: 70%.
-- **Attendance Consistency**: 10%.
-- **Assignment Completion**: 20%.
-- This allows for a holistic "Student Performance Index" rather than a raw GPA.
+## Who can see what
 
-### 2. Performance Snapshots
-Because calculating complex subject-matter competency in real-time is expensive, the system uses "Snapshots" (e.g., `quiz_analytics_snapshots`). These represent the state of a student's knowledge at a specific point in time, allowing for historical growth charting.
+- **Configuration** of weights requires **`student_analytics.configure`**.
+- **Viewing** dashboards for arbitrary students and batches requires **`student_analytics.view`**.
+- The **`my-analytics`** surface is for the **signed-in user** (module must be entitled); it does not expose other learners’ data through the same routes.
 
-### 3. Subject-Matter Competency
-By tracking performance against the `Exam Hierarchy` (Subject $\rightarrow$ Chapter $\rightarrow$ Topic), the dashboard can specifically flag: "Student X is struggling with Algebra but excels in Geometry". 
+## Freshness and cost
 
-## Real-time Recalculation
-When significant assessment data is added, the system logs a `recalculation_request`. This ensures that analytics remain fresh without impacting the performance of the core student-facing testing engine.
+Heavy recomputation runs in **background jobs** and scheduled rebuilds so interactive pages stay fast. A **recalculation log** supports operational monitoring when jobs fail or run slowly.
+
+## Pedagogy
+
+Topic and batch views help staff intervene early—for example extra practice in weak areas—without replacing official transcripts or manual instructor judgment.
 
 ---
 
-## Linked References
-- Related Modules: `Quiz`, `Exam-Hierarchy`, `Attendance`.
+## Linked references
+
+- **Quiz** — primary assessment input
+- **Attendance / assignments** — where listeners integrate those signals

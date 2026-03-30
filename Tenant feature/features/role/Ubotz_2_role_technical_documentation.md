@@ -1,32 +1,59 @@
-# UBOTZ 2.0 Role Technical Specification
+# UBOTZ 2.0 — Role (tenant RBAC) — Technical Specification
 
-## Core Architecture
-Roles are managed as platform-level definitions applied per-tenant. The implementation utilizes a Centralized RBAC model where role definitions live in the Central DB to ensure consistency across the platform.
+## Scope
 
-## Relational Schema Constraints
+Custom and system **roles** per tenant, **capability** catalog, role–capability assignments, and **user–role** assignments. Implemented in the **tenant** database (not the platform “central” catalog only). Routes: `backend/routes/tenant_dashboard/roles.php`.
 
-### 1. Definitions (Central DB)
-- **`tenant_roles`**: Stores the role identity (`slug`, `display_name`).
-- **`tenant_capabilities`**: The master list of all possible actions in the system.
-- **`tenant_role_capabilities`**: The join table mapping capabilities to specific roles (`idx_role_capability`).
+## HTTP map (base `/api/tenant/roles`)
 
-### 2. Assignments (Tenant DB)
-- **`user_role_assignments`**: Links a `user_id` inside a tenant's database to a `role_id` from the central catalog.
-  - **Constraint**: One primary role is typically assigned per user, though the schema supports multiple assignments for complex staff duties.
+| Method | Path | Capability |
+|--------|------|------------|
+| GET | `/roles` | `role.view` |
+| GET | `/roles/stats` | `role.view` |
+| GET | `/roles/capabilities` | `role.view` — optional `role_type` query; filters `tenant_capabilities` by `config('tenant_role_scopes')` patterns |
+| POST | `/roles` | `role.manage` |
+| PUT | `/roles/{id}` | `role.manage` |
+| DELETE | `/roles/{id}` | `role.manage` |
+| PATCH | `/roles/{id}/toggle-active` | `role.manage` |
 
-## Authorization Middleware
-Access control is enforced via the `tenant.capability:{slug}` middleware.
-1. The middleware identifies the authenticated User.
-2. It resolves the User's assigned Roles from `user_role_assignments`.
-3. it checks if any assigned Role possesses the required Capability in `tenant_role_capabilities`.
-4. If found, the request proceeds; otherwise, a `403 Forbidden` is returned.
+Controller: `App\Http\TenantAdminDashboard\Role\Controllers\TenantRoleController`.
 
-## Performance Optimization
-- **Caching**: Capability assignments are heavily cached using Redis (namespaced by `tenant_id`) to avoid expensive cross-database joins on every HTTP request.
-- **Indices**: `uq_tenant_roles_tenant_slug` ensures role uniqueness within a tenant scope.
+## Application layer
+
+| Component | Role |
+|-----------|------|
+| `ListTenantRolesQuery`, `GetTenantRoleStatsQuery` | Read models |
+| `CreateTenantRoleUseCase`, `UpdateTenantRoleUseCase`, `DeleteTenantRoleUseCase` | Mutations with **hierarchy** checks via `GetActorHierarchyLevelQuery` |
+| `CreateTenantRoleCommand` / `UpdateTenantRoleCommand` | Input to use cases |
+
+## Persistence (tenant DB)
+
+All of the following are **tenant-isolated** (see `BelongsToTenant` on models such as `TenantRoleRecord`):
+
+| Table | Purpose |
+|-------|---------|
+| `tenant_roles` | Role definitions per tenant (`display_name`, `is_system`, `is_active`, plus fields such as `code`, `hierarchy_level`, `role_type` in current models) |
+| `tenant_capabilities` | Capability catalog (`code`, `group`, …) — seeded via `TenantCapabilitySeeder` |
+| `tenant_role_capabilities` | Role ↔ capability |
+| `user_role_assignments` | User ↔ role |
+
+Implementations and migrations evolve; use the latest migrations and `TenantRoleRecord` as source of truth for column names.
+
+## Authorization middleware
+
+`tenant.capability:{code}` — resolves the authenticated tenant user’s roles and checks whether the required capability is granted (implementation in `TenantCapabilityCheckerInterface` and related middleware).
+
+## Seeded capabilities (role feature)
+
+From `TenantCapabilitySeeder`: **`role.view`**, **`role.manage`**.
+
+## Frontend
+
+`frontend/config/api-endpoints.ts` — `TENANT.ROLES`: `/api/tenant/roles` (extend with `/stats`, `/capabilities` in clients as needed).
 
 ---
 
-## Linked References
-- Security Checklist: See `Global Rule § RBAC`.
-- Related Modules: `User`, `Auth`.
+## Linked references
+
+- **Users** — `user_role_assignments` ties users to roles
+- **Identity** — tenant JWT and `TenantContext` supply `tenant_id`

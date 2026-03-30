@@ -1,39 +1,66 @@
-# UBOTZ 2.0 Meeting & Live Session Technical Specification
+# UBOTZ 2.0 — Meeting — Technical Specification
 
-## Core Architecture
-The Meeting module is a high-concurrency scheduling context (`TenantAdminDashboard\Meeting`). It utilizes a "Claim-Based" slot reservation model to prevent double-booking.
+## Scope
 
-## Relational Schema Constraints
+Scheduling for hosts (availability, overrides), booking flows (instant book vs request), host responses, meeting links and outcomes, student self-service, and admin-wide visibility. Application code: `App\Application\TenantAdminDashboard\Meeting\UseCases\` and controllers under `App\Http\Controllers\Api\TenantAdminDashboard\Meeting\`.
 
-### 1. Availability Layer (`meeting_availabilities`)
-- **`tenant_id`**: Structural isolation.
-- **`recurrence_type`**: Logic for expanding slots (e.g., `weekly`, `specific`).
-- **Indices**: `idx_meeting_avail_host_day` enables rapid calendar rendering for specific week-view requests.
+## Route entry point
 
-### 2. Booking Layer (`meeting_bookings`)
-- **`host_id` / `requester_id`**: Foreign keys to the `User` context.
-- **`status`**: State machine (`pending`, `confirmed`, `countered`, `completed`, `cancelled`).
-- **`slot_duration_minutes`**: Drives the logic for `end_time` generation.
+| File | Prefix |
+|------|--------|
+| `backend/routes/tenant_dashboard/meeting.php` | `/api/tenant/meetings` |
 
-### 3. Concurrency Protection (`meeting_slot_claims`)
-- **`unq_meeting_slot_claim`**: A critical composite index `(tenant_id, host_id, start_time)`. 
-- **Purpose**: Prevents two students from booking the exact same start-time for the same instructor, even if checkout processes are running in parallel.
+## Capabilities
 
-## Key Technical Workflows
+| Capability | Routes |
+|------------|--------|
+| `meeting.manage_availability` | `/meetings/availabilities/*` — CRUD availability, deactivate, add/remove overrides |
+| `meeting.manage_bookings` | `/meetings/bookings/*` — list/show host bookings, respond, link, outcome, cancel |
+| `meeting.view_all` | `/meetings/admin/bookings`, `/meetings/admin/stats` |
+| *(none on student group)* | `/meetings/student/*` — exposed to authenticated tenant users per controller/policy logic |
 
-### Generating bookable slots
-1. The system fetches `availabilities` and `overrides`.
-2. It expands the schedule based on `recurrence_type`.
-3. It subtracts existing `meeting_bookings` and `slot_claims`.
-4. It returns the remaining non-overlapping windows to the front-end.
+Student routes have **no** `tenant.capability` middleware in the route file; authorization is enforced inside controllers/use cases (e.g. requester vs host).
 
-### Meeting Provider Integration
-- When a booking moves to `confirmed`, the `ResolveMeetingProviderUseCase` generates dynamic links for supported drivers (Zoom/Teams) and stores them in `meeting_link`.
+## HTTP map (summary)
 
-## Tenancy & Security
-Every booking and availability is strictly bound by `tenant_id`. The "Slot Claim" engine ensures that cross-tenant availability scans are impossible, as all unique constraints are qualified by the `tenant_id`.
+| Prefix | Purpose |
+|--------|---------|
+| `GET/POST /meetings/availabilities`, `GET/PUT /meetings/availabilities/{id}`, `PATCH .../deactivate`, `POST .../overrides`, `DELETE .../overrides/{overrideId}` | Host availability management |
+| `GET /meetings/bookings`, `GET /meetings/bookings/{id}`, `PATCH .../respond`, `link`, `outcome`, `cancel` | Host booking management |
+| `GET /meetings/admin/bookings`, `GET /meetings/admin/stats` | Admin overview |
+| `GET /meetings/student/hosts`, `GET .../hosts/{hostId}/slots`, `POST .../book`, `POST .../request`, `GET .../my-bookings`, `GET .../my-bookings/{id}`, `PATCH .../cancel`, `PATCH .../respond-counter` | Student flows |
+
+Paths match `frontend/config/api-endpoints.ts` → **`TENANT_MEETING`**.
+
+## Application use cases (examples)
+
+Under `Meeting\UseCases\`:
+
+- Availability: `CreateMeetingAvailabilityUseCase`, `UpdateMeetingAvailabilityUseCase`, `DeactivateMeetingAvailabilityUseCase`, `AddMeetingAvailabilityOverrideUseCase`, `RemoveMeetingAvailabilityOverrideUseCase`
+- Booking: `BookMeetingFromAvailabilityUseCase`, `RequestMeetingUseCase`, `RespondToMeetingRequestUseCase`, `RespondToMeetingCounterUseCase`, `UpdateMeetingBookingLinkUseCase`, `RecordMeetingOutcomeUseCase`, `CancelMeetingUseCase`
+
+## Persistence (tenant)
+
+Single migration bundle: `backend/database/migrations/tenant/2026_03_18_120000_create_meeting_system_tables.php`
+
+| Table | Notes |
+|-------|--------|
+| `meeting_availabilities` | Host, recurrence (`recurrence_type`, `recurrence_day`, `specific_date`), time window, slot/buffer minutes, defaults for mode/venue/link, `effective_from` / `effective_until` |
+| `meeting_availability_overrides` | Per-date block/override; unique `(availability_id, override_date)` |
+| `meeting_bookings` | Host, requester, optional `availability_id`, `booking_type`, `status`, `mode`, time range, venue, `meeting_link`, optional `course_id`, counter-proposal fields, `price_cents`, cancellation/outcome fields |
+| `meeting_slot_claims` | **Unique** `(tenant_id, host_id, start_time)` as `unq_meeting_slot_claim` — concurrency guard for the same host slot |
+
+## Scheduling (console)
+
+`backend/routes/console.php`:
+
+- `meeting:expire-requests` — hourly
+- `meeting:auto-complete` — daily at `00:30`
 
 ---
 
-## Linked References
-- Related Modules: `User`, `Timetable`.
+## Linked references
+
+- **Users** — hosts and requesters
+- **Courses** — optional `course_id` on bookings
+- **Locale / timezone** — display of times in clients uses tenant timezone context where applicable

@@ -1,27 +1,24 @@
-# UBOTZ 2.0 Timetable Business Findings
+# UBOTZ 2.0 — Timetable — Business Findings
 
-## Executive Summary
-The Timetable module handles the temporal orchestration of institutional activities. It is the "Brain" of the physical and digital campus, managing when batches meet, where they meet (Venue/Branch), and who is teaching them.
+## Executive summary
 
-## Operational Modalities
+The **timetable** defines **where and when** teaching happens: **venues**, **holidays**, reusable **weekly templates** with **slots**, and concrete **session instances** generated for real calendar dates. Staff with **view** can browse schedules; those with **manage** maintain master data and handle **cancellations**, **reschedules**, and **substitute** instructors when real life intervenes.
 
-### 1. Global Settings
-Tenants define institutional working parameters:
-- **`week_starts_on`**: Crucial for regional variations (e.g., Sunday-start vs. Monday-start).
-- **`working_days`**: Defines the "Active Week" for the institution.
-- **Conflict Mode**: `hard_block` prevents overlapping sessions, while `soft_warning` allows for administrative flexibility during high-density scheduling cycles.
+## Settings
 
-### 2. Session Lifecycle
-- **Recurrence**: Supports automated generation of sessions for a full academic term (e.g. "Generate sessions for English Batch A every MWF for the next 12 weeks").
-- **Rescheduling**: Accommodates real-world disruptions (Staff illness, public holidays) by allowing individual sessions to be moved or cancelled without destroying the underlying schedule template.
+**`timetable_settings`** (per tenant) capture institutional defaults: conflict handling (`conflict_mode` such as hard block vs softer behavior), week start, which weekdays count as working days, timezone, and generation preferences—so generated sessions match local norms.
 
-### 3. Timetable vs. Attendance
-A `Timetable Session` represents the **Plan**. Once the session time arrives, it serves as the parent record for an `Attendance Session`, which tracks the **Actual** physical participation.
+## Plan vs attendance
 
-## Coordination
-The Timetable ensures that a single Branch Classroom or Instructor isn't booked for two different batches at the same hour, significantly reducing institutional friction.
+Session instances represent the **planned** calendar. **Attendance** records whether people actually showed; linkage exists in schema (`timetable_session_id` on attendance where migrated)—business rules define when a session is “due” for marking.
+
+## Scale
+
+Templates allow **publish** workflows; publishing can trigger **instance generation** so the live calendar stays in sync without hand-entering every occurrence.
 
 ---
 
-## Linked References
-- Related Modules: `Batch`, `Branch`, `Attendance`, `Meeting`.
+## Linked references
+
+- **Batch** — who the schedule serves
+- **Meeting** — separate booking product; timetable is institution-wide class scheduling

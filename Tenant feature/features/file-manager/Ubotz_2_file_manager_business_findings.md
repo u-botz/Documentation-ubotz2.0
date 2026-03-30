@@ -1,29 +1,23 @@
 # UBOTZ 2.0 File Manager Business Findings
 
 ## Executive Summary
-The File Manager is the centralized asset repository for Ubotz 2.0 tenants. It acts as a digital cross-reference engine for educational materials (PDFs, Videos), marketing assets (Logos, Banners), and student submissions (Assignments). It provides a unified, secure, and structured interface for managing all binary data across the tenant ecosystem.
 
-## Operational Modalities
+The **file manager** is the tenant’s **user-scoped** library for uploads: folders and files stored on the configured **disk** (e.g. local or S3) with metadata for name, MIME type, and size. It is used for **general assets** (branding, documents) whose paths can be referenced from other features.
 
-### 1. Centralized vs. Contextual Storage
-The system distinguishes between general administrative assets and curriculum-bound materials:
-- **Managed Files (`managed_files`)**: General-purpose files (e.g., student profile pictures, receipt PDFs, tenant branding assets) authored by specific users.
-- **Course Files (`course_files`)**: Instructional materials bound to specific **Courses** and **Chapters**. These files are the core educational deliverables students consume during their learning journey.
-
-### 2. Media Rendering & Accessibility
-- **`accessibility`**: Determines whether a file is `free` (publicly accessible) or `paid` (locked behind a Course Enrollment gate).
-- **`downloadable`**: A business-level toggle allowing instructors to restrict students from locally saving high-value proprietary assets.
-- **Streaming Support**: Through `file_source` (e.g., `upload` or `vimeo`/`youtube`), the system handles both local S3 storage and external video providers.
-
-### 3. Hierarchical Organization
-- **Directory Structure**: Using `directory_id`, the system allows admins to organize thousands of assets into logical folders, preventing "file clutter" in large enterprise deployments.
-
-## Commercial Integration
-- **Revenue Protection**: By mapping files to specific `course_id` entries and enforcing enrollment-based tokens, the system prevents unauthorized sharing of proprietary curriculum content.
-- **Auditing**: `size_bytes` tracking allows the Platform Root to monitor storage quotas per tenant, ensuring billing accuracy for high-volume media usage.
+**Course materials** are primarily modeled as **`course_files`** (bound to **courses** and **chapters**) with business rules for **accessibility**, **downloadability**, and **video** sources — overlapping with the file manager only when a workflow stores a **path** into a course.
 
 ---
 
-## Linked References
-- Status report: `../../status reports/FileManager_Status_Report.md`
-- Related Modules: `Course`, `Assignment`, `Student Billing`.
+## Permissions
+
+- **`file.view`** — browse, download, stream.
+- **`file.upload`** — upload.
+- **`file.create_directory`** — new folders.
+- **`file.manage`** — rename, move, delete files and directories.
+
+---
+
+## Linked references
+
+- **Technical specification:** `Ubotz_2_file_manager_technical_documentation.md`.
+- **Related:** Courses (chapter files), assignments (file paths), fee receipts (downloads).

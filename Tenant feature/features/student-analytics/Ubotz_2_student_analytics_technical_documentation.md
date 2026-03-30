@@ -1,35 +1,63 @@
-# UBOTZ 2.0 Student Analytics Technical Specification
+# UBOTZ 2.0 — Student Analytics — Technical Specification
 
-## Core Architecture
-Student Analytics is an asynchronous processing context (`TenantAdminDashboard\StudentAnalytics`). It focuses on transforming raw transactional data (quizzes, attendance) into pedagogical insights.
+## Scope
 
-## Relational Schema Constraints
+Weighted **performance** views, **batch** views, **topic mastery**, **self-service “my analytics”**, and **config** for dimension weights. Routes: `backend/routes/tenant_dashboard/student_analytics.php`. Application code: `App\Application\TenantAdminDashboard\StudentAnalytics\`.
 
-### 1. Configuration (`analytics_weight_configs`)
-- **`dimension`**: The metric category (e.g., `assessment`, `attendance`).
-- **`weight`**: Relative coefficient used in grand-total calculations.
-- **Indices**: `unq_awc_tenant_dimension` ensures one configuration per metric per tenant.
+## Module and capabilities
 
-### 2. Snapshotting (`quiz_analytics_snapshots`)
-- Captures the aggregate scores per subject/chapter for a student.
-- Prevents expensive $O(N^2)$ recursive joins across the Question Bank during UI render cycles.
+- **Module:** `tenant.module:module.student_analytics` on both route groups below.
 
-## Key Technical Workflows
+| Capability | Routes |
+|------------|--------|
+| `student_analytics.configure` | `GET`/`PUT /api/tenant/analytics/config` |
+| `student_analytics.view` | All other `/analytics/*` read endpoints below |
 
-### The Recalculation Engine
-1. Assessment completions trigger a `RequestAnalyticsRecalculationJob`.
-2. The job logs the request in `analytics_recalculation_log`.
-3. A background daemon processes the queue, aggregates metrics using the `weight_configs`, and updates the latest `Snapshots`.
+**Self-service:** `/api/tenant/my-analytics` has **no** capability middleware in the route file—only the module gate; any extra checks must live in controllers/use cases.
 
-### Dashboard Aggregation
-- Optimized for the `EloquentDashboardStatsQuery` (Dashboard 2.0). 
-- Utilizes the `Cache::remember` closures to serve these pre-processed snapshots to Tenant Admins with sub-100ms latency.
+## HTTP map (base `/api/tenant`)
 
-## Tenancy & Security
-Every configuration and log is strictly bound by `tenant_id` (`fk_awc_tenant`). The recalculation process is sandboxed to the active tenant's database connection to prevent cross-tenant resource contention.
+### Admin/instructor (`/analytics`)
+
+| Method | Path |
+|--------|------|
+| GET/PUT | `/analytics/config` |
+| GET | `/analytics/students`, `/analytics/students/{studentId}`, `/analytics/students/{studentId}/history`, `/analytics/students/{studentId}/topics` |
+| GET | `/analytics/batches`, `/analytics/batches/{batchId}`, `/analytics/batches/{batchId}/students` |
+| GET | `/analytics/topics` |
+
+### Current user (`/my-analytics`)
+
+| Method | Path |
+|--------|------|
+| GET | `/my-analytics`, `/my-analytics/history`, `/my-analytics/topics` |
+
+Controllers include `AnalyticsConfigController`, `StudentAnalyticsController`, `BatchAnalyticsController`, `TopicMasteryController`, `MyAnalyticsController`.
+
+## Application layer (examples)
+
+Use cases: `GetAnalyticsConfigUseCase`, `UpdateAnalyticsConfigUseCase`, `ListStudentPerformanceUseCase`, `GetStudentPerformanceUseCase`, `GetStudentPerformanceHistoryUseCase`, `GetStudentTopicMasteryUseCase`, `ListBatchPerformanceUseCase`, `GetBatchPerformanceUseCase`, `ListBatchStudentsUseCase`, `GetTopicMasteryHeatmapUseCase`, `GetMyPerformanceUseCase`, plus recalculation: `RecalculateStudentPerformanceUseCase`, `RecalculateBatchPerformanceUseCase`, `RecalculateTopicMasteryUseCase`, `FullRecalculationUseCase`.
+
+Jobs (examples): `RecalculateStudentPerformanceJob`, `RecalculateBatchPerformanceJob`, `RecalculateTopicMasteryJob`, `NightlyAnalyticsRebuildJob`. Command: `analytics:rebuild` (scheduled in `routes/console.php`).
+
+Listeners react to domain events (e.g. quiz finalized, attendance marked, assignment graded) to keep aggregates fresh.
+
+## Persistence (tenant)
+
+| Migration | Table / purpose |
+|-----------|-----------------|
+| `2026_03_26_190001_create_analytics_weight_configs_table.php` | **`analytics_weight_configs`** — `dimension`, `weight`; **unique** `(tenant_id, dimension)` as `unq_awc_tenant_dimension` |
+| `2026_03_26_190006_create_analytics_recalculation_log_table.php` | **`analytics_recalculation_log`** — run metadata |
+| `2026_03_28_200000_create_quiz_analytics_snapshots_table.php` | **`quiz_analytics_snapshots`** — pre-aggregated data |
+
+## Frontend
+
+Add paths under `/api/tenant/analytics` and `/api/tenant/my-analytics` in `api-endpoints.ts` if not already centralized.
 
 ---
 
-## Linked References
-- Related Artifacts: `Dashboard Stats Query Performance Optimization`.
-- Related Modules: `Exam-Hierarchy`, `Quiz`.
+## Linked references
+
+- **Quiz** — results feed analytics
+- **Batches** — cohort views
+- **Exam hierarchy** — topic-level mastery

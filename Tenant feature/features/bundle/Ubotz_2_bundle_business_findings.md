@@ -1,25 +1,22 @@
 # UBOTZ 2.0 Bundle Business Findings
 
 ## Executive Summary
-Bundles are a primary commercial tool for Ubotz 2.0 tenants. They allow institutions to group multiple existing `Courses` into a single sellable package (e.g., "Complete Web Development Path" containing HTML, CSS, and JS courses). Bundles drive higher Average Order Value (AOV) and simplify the enrollment process for long-term academic tracts.
 
-## Operational Modalities
+A **bundle** is a **priced package of courses** under one tenant: marketing copy, thumbnail, visibility (**`is_private`**), and lifecycle status (**draft** / **published** / **archived**). Students who enroll receive a **bundle enrollment** record and, typically, **individual course enrollments** for each included course (subject to capacity and existing enrollments).
 
-### 1. Composition
-- **`bundle_courses`**: Admins select which courses belong to the bundle.
-- **Independent Lifecycle**: Prices for bundles are distinct from the individual sum of their parts, allowing for "Bundle Discounts".
-- **`access_days`**: Defines the global tenure for the entire package.
-
-### 2. Enrollment Lifecycle
-When a student purchases a **Bundle**, the system automatically generates **Course Enrollments** for every child course inside the package. This ensures that the student immediately gains access to all pedagogical materials with a single transaction.
-
-### 3. Publication State
-Bundles follow the standard state machine (`draft` $\rightarrow$ `published`). This allows marketing teams to prepare the bundle structure and marketing copy before syndeicating the SKU to the public landing page.
-
-## Commercial Integration
-Bundles are treated as a first-class `orderable_type` in the Payment module. Successful settlement of a bundle purchase emits a `BundlePurchasedEvent`, which triggers the bulk-enrollment listeners.
+Commercial checkout may attach **`sale_id`** and pricing snapshots on **`bundle_enrollments`**; admin enrollment APIs support **idempotency** for safe retries.
 
 ---
 
-## Linked References
-- Related Modules: `Course`, `Enrollment`, `Payment`.
+## Operational modalities
+
+- **Composition:** Courses are ordered in **`bundle_courses`** (with **`sort_order`** after alignment migrations).
+- **Pricing:** Bundle price is stored in minor units (**cents**); **`locked_price_cents`** on the enrollment preserves the price at purchase when applicable.
+- **Access:** Course access for bundle buyers is enforced through the **enrollment / access** layer (bundle + per-course enrollment), not by a single “bundle password.”
+
+---
+
+## Linked references
+
+- **Technical specification:** `Ubotz_2_bundle_technical_documentation.md` (routes, schema, `EnrollStudentInBundleUseCase`).
+- **Related:** Courses, course enrollments, payments/sales, subscription plan features if bundles are quota-gated.
