@@ -4,7 +4,7 @@
 
 Assignments let tenants collect **text and file-based work** from students, tied to **courses and chapters**, with **deadline rules**, **instructor grading**, and **pass/fail** against configurable thresholds. The feature is distinct from the automated Quiz engine: it emphasizes subjective review, feedback, and optional file evidence.
 
-For implementation detail (APIs, schema, status values, and known integration gaps), see **`Ubotz_2_assignment_technical_documentation.md`** in this folder.
+For implementation detail (APIs, schema, status values), see **`Ubotz_2_assignment_technical_documentation.md`** in this folder.
 
 ---
 
@@ -23,8 +23,8 @@ For implementation detail (APIs, schema, status values, and known integration ga
 
 ### Student experience
 
-- Students submit **text** and/or a **file reference** (storage path produced by the tenant’s file workflow).
-- Typically **one active submission** per student per assignment; **retraction** is allowed only while the work is still **pending review** (before grading), so instructors are not asked to review work the student has withdrawn.
+- Students submit **text** and/or an **attached file** (multipart upload stored server-side as a path) and/or a **file path** string when supplied by another client workflow.
+- Typically **one active submission** per student per assignment; **retraction** is allowed only while the work is still **pending review** (before grading), so instructors are not asked to review work the student has withdrawn. The student LMS uses the tenant API retract endpoint aligned with the backend (see technical doc).
 
 ### Instructor experience
 

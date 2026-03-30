@@ -16,7 +16,7 @@ Routes: `backend/routes/tenant_dashboard/enrollment.php`, under **`tenant.module
 | `GET` | `/courses/{course}/check-access` | `EnrollmentReadController@checkAccess` |
 | `POST` | `/courses/{course}/enroll` | `EnrollmentWriteController@enroll` |
 
-**Note:** `EnrollmentWriteController@enroll` calls **`EnrollStudentUseCase::execute($tenantId, $userId, $courseId)`** with default source — it does **not** pass an **idempotency key** from the HTTP layer (checkout flows that need idempotency should use use cases / payment paths that supply it).
+**Idempotency:** `POST /courses/{course}/enroll` forwards an optional **`Idempotency-Key`** HTTP header or JSON body field **`idempotency_key`** to **`EnrollStudentUseCase`** (same semantics as bundle enrollment). Omitting the key keeps legacy behavior (no idempotency de-duplication). Retries with the same key must not create a second active enrollment row.
 
 ### 1.2 Admin (`/api/tenant/admin/enrollments`)
 
@@ -79,3 +79,4 @@ Later migrations add **idempotency key**, **suspension** fields, etc. — grep `
 ## 6. Document history
 
 - Expanded with **routes**, **use-case names**, **bundle** linkage, and removed vague “only payment listeners” coupling; enrollment is also created from **admin grant** and **bundle** flows.
+- Documented **`Idempotency-Key`** / **`idempotency_key`** on student self-serve enroll.

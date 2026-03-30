@@ -58,7 +58,7 @@ Phase 17d adds: `source`, `status`, `locked_price_cents`, `bundle_name`, `idempo
 3. For each course in the bundle: skips if **course capacity** full; reuses existing **active** `course_enrollment` if present; otherwise creates **`CourseEnrollmentEntity`** with source **`EnrollmentSource::BUNDLE`**.
 4. Audits `bundle.student_enrolled`; dispatches **`BundleEnrollmentCreated`** after commit.
 
-There is **no** guarantee in this use case that **`access_days`** from the bundle is applied to each `course_enrollment` `expires_at` (enrollments may be created with `expiresAt: null` — verify product expectations against payment/checkout flows).
+**Access window:** When the bundle has a non-null **`access_days`**, `EnrollStudentInBundleUseCase` sets **`expires_at`** on both the **`bundle_enrollment`** row and each newly created **`course_enrollment`** using **`AccessDuration`** from enrollment time (same idea as single-course free enroll). If **`access_days`** is null or zero, `expires_at` remains open-ended (`null`). Create/update bundle APIs accept optional **`access_days`** (persisted on `bundles.access_days` via `BundleProps`).
 
 ---
 
@@ -98,3 +98,4 @@ All bundle queries must be scoped by **`tenant_id`** in repositories. Capabiliti
 
 - Replaced **`BundlePurchasedEvent` / `InstantiateBundleEnrollmentUseCase`** with **`EnrollStudentInBundleUseCase`** and **`BundleEnrollmentCreated`**.
 - Documented **Phase 17d** schema alignment and **dual** enrollment endpoints.
+- Documented **`access_days`** on create/update and application to **`expires_at`** on bundle + course enrollments at purchase/enroll time.

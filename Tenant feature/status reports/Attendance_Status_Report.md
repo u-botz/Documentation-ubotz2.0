@@ -8,7 +8,7 @@
 | **Bounded Context** | TenantAdminDashboard |
 | **Date Reported** | 2026-03-22 |
 | **Reported By** | AI Agent |
-| **Current Status** | **Partially Implemented (Critical Route Blocks)** — Only basic session and student records active |
+| **Current Status** | **Implemented (core + reports + staff + self-service)** — Session/record/settings routes active; student reports, staff read/write, and `my` self-service routes are registered. Record **audit** read and **parent/child** attendance remain stubs or unimplemented (see §4). |
 | **Has Developer Instructions Doc?** | No |
 | **Has Implementation Plan?** | No |
 | **Was Principal Engineer Audit Done?** | No |
@@ -25,22 +25,20 @@ The Attendance feature is designed to track student and staff presence against s
 
 ### 2.1 Controllers
 
-*(Routes found in `routes/tenant_dashboard/attendance.php`)*
-
-**🚨 CRITICAL ARCHITECTURAL FINDING:** Nearly 50% of this feature's file is deliberately commented out using `/* ... */` multiline comments. Self-service and most staff routes are disabled.
+*(Routes found in `routes/tenant_dashboard/attendance.php` — also `Route::prefix('my')` for self-service outside the `attendance` prefix.)*
 
 | Controller | Methods | Notes |
 |---|---|---|
 | `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\AttendanceSessionReadController` | `index`, `show` | Active |
 | `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\AttendanceSessionWriteController` | `store`, `complete` | Active |
-| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\AttendanceRecordWriteController` | `bulkMark`, `update`, `override` | Active - `bulkMark` is mapped to `sessions/{id}/mark` |
+| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\AttendanceRecordWriteController` | `bulkMark`, `update`, `override` | Active — `bulkMark` is mapped to `sessions/{id}/mark` |
 | `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\AttendanceSettingsReadController` | `show` | Active |
 | `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\AttendanceSettingsWriteController` | `update` | Active |
-| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\StudentAttendanceReadController` | `summary`, `batchReport`, `lowAttendance`, `teacherCompliance`, `export` | **COMMENTED OUT (Inactive)** |
-| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\StaffAttendanceReadController` | `index`, `report` | **COMMENTED OUT (Inactive)** |
-| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\StaffAttendanceWriteController` | `bulkMark`, `update` | **COMMENTED OUT (Inactive)** |
-| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\MyAttendanceReadController` | `summary`, `sessions`, `childSummary` | **COMMENTED OUT (Inactive)** |
-| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\AttendanceAuditReadController` | `show` | **COMMENTED OUT (Inactive)** |
+| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\StudentAttendanceReadController` | `summary`, `batchReport`, `lowAttendance`, `teacherCompliance`, `export` | Active — `summary` allows self-access for `{id}` = current user without `attendance.view`; report/export routes require `attendance.view` |
+| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\StaffAttendanceReadController` | `index`, `report` | Active — `attendance.view` |
+| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\StaffAttendanceWriteController` | `bulkMark`, `update` | Active — `attendance.manage` |
+| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\MyAttendanceReadController` | `summary`, `sessions`, `childSummary` | Active — `summary`/`sessions` for current user; `childSummary` returns **501 Not Implemented** until parent/child product rules exist |
+| `App\Http\Controllers\Api\TenantAdminDashboard\Attendance\AttendanceAuditReadController` | `show` | **Not registered** — route remains commented (no controller wiring) |
 
 ### 2.2 UseCases / Queries
 
@@ -161,19 +159,33 @@ Contains logic rules like `lock_period_hours` (default 48).
 
 ## 4. API Endpoints
 
-| Method | URI | Controller@Method | Middleware |
-|---|---|---|---|
-| `GET` | `/api/tenant/attendance/sessions` | `AttendanceSessionReadController@index` | `tenant.module` |
-| `POST` | `/api/tenant/attendance/sessions` | `AttendanceSessionWriteController@store` | `tenant.module` |
-| `GET` | `/api/tenant/attendance/sessions/{id}` | `AttendanceSessionReadController@show` | `tenant.module` |
-| `POST` | `/api/tenant/attendance/sessions/{id}/mark` | `AttendanceRecordWriteController@bulkMark` | `tenant.module` |
-| `POST` | `/api/tenant/attendance/sessions/{id}/complete`| `AttendanceSessionWriteController@complete` | `tenant.module` |
-| `PATCH` | `/api/tenant/attendance/records/{id}` | `AttendanceRecordWriteController@update` | `tenant.module` |
-| `POST` | `/api/tenant/attendance/records/{id}/override` | `AttendanceRecordWriteController@override` | `tenant.module` |
-| `GET` | `/api/tenant/attendance/settings` | `AttendanceSettingsReadController@show` | `tenant.module` |
-| `PUT` | `/api/tenant/attendance/settings` | `AttendanceSettingsWriteController@update` | `tenant.module` |
+Routes are included from `routes/tenant_dashboard/attendance.php` under the shared **`/api/tenant`** authenticated group (see `api.php`). Unlike some features, this file does **not** wrap all paths in **`tenant.module:module.erp.attendance`**; **`attendance.view`** / **`attendance.manage`** still require the tenant to have entitlement **`module.erp.attendance`** for those capabilities to evaluate as granted (see `ModuleCapabilityMap` + `TenantCapabilityChecker`). Middleware on the route file: **`tenant.capability:attendance.view`** for report/staff read groups; **`tenant.capability:attendance.manage`** for staff writes. Session and record mutations rely on capability checks inside use cases (e.g. bulk mark → `attendance.manage`).
 
-**Note**: Nearly 50% of the routes defined in the routes file (Staff, Self-Service, Reports, Audits) are literally commented out block statements. See **Known Issues**. 
+| Method | URI | Controller@Method | Capability / notes |
+|---|---|---|---|
+| `GET` | `/api/tenant/attendance/sessions` | `AttendanceSessionReadController@index` | Auth + use-case checks |
+| `POST` | `/api/tenant/attendance/sessions` | `AttendanceSessionWriteController@store` | Auth + use-case checks |
+| `GET` | `/api/tenant/attendance/sessions/{id}` | `AttendanceSessionReadController@show` | Auth + use-case checks |
+| `POST` | `/api/tenant/attendance/sessions/{id}/mark` | `AttendanceRecordWriteController@bulkMark` | Use case checks `attendance.manage` |
+| `POST` | `/api/tenant/attendance/sessions/{id}/complete`| `AttendanceSessionWriteController@complete` | Auth + use-case checks |
+| `PATCH` | `/api/tenant/attendance/records/{id}` | `AttendanceRecordWriteController@update` | Auth + use-case checks |
+| `POST` | `/api/tenant/attendance/records/{id}/override` | `AttendanceRecordWriteController@override` | Auth + use-case checks |
+| `GET` | `/api/tenant/attendance/settings` | `AttendanceSettingsReadController@show` | Auth + use-case checks |
+| `PUT` | `/api/tenant/attendance/settings` | `AttendanceSettingsWriteController@update` | Auth + use-case checks |
+| `GET` | `/api/tenant/attendance/students/{id}/summary` | `StudentAttendanceReadController@summary` | Self OR `attendance.view` for other students (see controller) |
+| `GET` | `/api/tenant/attendance/reports/batch/{id}` | `StudentAttendanceReadController@batchReport` | `attendance.view` |
+| `GET` | `/api/tenant/attendance/reports/low-attendance` | `StudentAttendanceReadController@lowAttendance` | `attendance.view` |
+| `GET` | `/api/tenant/attendance/reports/teacher-compliance` | `StudentAttendanceReadController@teacherCompliance` | `attendance.view` |
+| `GET` | `/api/tenant/attendance/reports/export` | `StudentAttendanceReadController@export` | `attendance.view` |
+| `GET` | `/api/tenant/attendance/staff` | `StaffAttendanceReadController@index` | `attendance.view` |
+| `GET` | `/api/tenant/attendance/staff/reports` | `StaffAttendanceReadController@report` | `attendance.view` |
+| `POST` | `/api/tenant/attendance/staff/mark` | `StaffAttendanceWriteController@bulkMark` | `attendance.manage` |
+| `PATCH` | `/api/tenant/attendance/staff/{id}` | `StaffAttendanceWriteController@update` | `attendance.manage` |
+| `GET` | `/api/tenant/my/attendance` | `MyAttendanceReadController@summary` | Authenticated tenant user (no `attendance.view` required for own summary) |
+| `GET` | `/api/tenant/my/attendance/sessions` | `MyAttendanceReadController@sessions` | Same |
+| `GET` | `/api/tenant/my/children/{id}/attendance` | `MyAttendanceReadController@childSummary` | **501** stub |
+
+**Not registered:** `GET /api/tenant/attendance/records/{id}/audit` (audit read controller/route commented).
 
 ---
 
@@ -182,8 +194,8 @@ Contains logic rules like `lock_period_hours` (default 48).
 | # | Check | Status | Notes |
 |---|---|---|---|
 | 1 | All queries scoped by `tenant_id`? | Yes | Checked via strict UNIQUE constraints spanning the `tenant_id` and BelongsToTenant. |
-| 2 | User-level isolation enforced where needed? | N/A | Feature is currently limited to pure Admin dashboard. Self-service is disabled. |
-| 3 | `tenant.capability` middleware on all routes? | **FAIL** | Unlike `Course` or `Branch`, the route grouping in `attendance.php` COMPLETELY misses the `tenant.capability` middleware declarations on the active endpoints blocks. |
+| 2 | User-level isolation enforced where needed? | Partial | Self-service `my/*` and student `summary` for own id are enabled; verify controller checks for cross-user access on every path. |
+| 3 | `tenant.capability` middleware on report/staff routes? | **Partial** | **`attendance.view`** / **`attendance.manage`** apply to report, staff read, and staff write groups. Core session/record/settings rely on use-case capability checks; student `summary` is special-cased for self-access. |
 | 4 | Audit log written for every mutation? | Partial | Implements `EloquentAttendanceAuditLogRepository`, completeness not verified per controller. |
 | 5 | Audit log written OUTSIDE `DB::transaction()`? | TBD | |
 | 6 | Domain events dispatched via `DB::afterCommit`? | TBD | Found unused events. |
@@ -199,7 +211,7 @@ Contains logic rules like `lock_period_hours` (default 48).
 
 ## 6. Frontend
 
-Likely experiencing broken Views or missing tabs if it attempts to call `#reports` or `#staff` endpoint paths which are commented out on the backend server. Feature flag evaluation is highly recommended.
+Frontend integrations should call **`/api/tenant/attendance/...`** and **`/api/tenant/my/...`** as above. Parent/child attendance (`children/{id}/attendance`) remains a **501** placeholder until product rules are defined.
 
 ---
 
@@ -220,8 +232,8 @@ Likely experiencing broken Views or missing tabs if it attempts to call `#report
 
 | # | Issue | Severity Guess | Notes |
 |---|---|---|---|
-| 1 | Missing Capability Middleware | High | The `routes.php` file for attendance lacks the `->middleware('tenant.capability:...')` chains seen in all other robust features. Unless heavily enforced in the Constructor, this is a privilege escalation vector. |
-| 2 | Dead Code / Commented Flows | High | Half the mapped route domain (Analytics, Reports, Staff, Self-Service/My) is manually commented out `/* ... */`, meaning the system is lacking critical operational visibility tools for Tenants. |
+| 1 | Audit read route | Medium | `records/{id}/audit` and `AttendanceAuditReadController` are not wired. |
+| 2 | Parent/child attendance | Low | `MyAttendanceReadController@childSummary` returns **501**. |
 | 3 | Missing Event Listeners | Medium | The domain events (e.g. `AttendanceMarked`, `StudentBelowThreshold`) exist but have no registered listeners. Gamification or notifications tied to attendance logic will fail silently. |
 
 ---
@@ -245,7 +257,10 @@ app/
 │   ├── AttendanceRecordWriteController.php
 │   ├── AttendanceSettingsReadController.php
 │   ├── AttendanceSettingsWriteController.php
-│   ├── (Commented: StudentAttendanceReadController, StaffAttendance*, MyAttendance*)
+│   ├── StudentAttendanceReadController.php
+│   ├── StaffAttendanceReadController.php
+│   ├── StaffAttendanceWriteController.php
+│   ├── MyAttendanceReadController.php
 ├── Http/Requests/TenantAdminDashboard/Attendance/
 │   ├── BulkMarkAttendanceRequest.php
 │   ├── BulkMarkStaffAttendanceRequest.php

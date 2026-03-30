@@ -14,12 +14,12 @@ Effective base: **`/api/tenant`** (included from `backend/routes/api.php` in the
 
 | Method | Path | Auth | Handler |
 |--------|------|------|---------|
-| `POST` | `/checkout/course` | `auth:api`, `resolve.tenant` | `CheckoutController::initializeCourseCheckout` |
+| `POST` | `/checkout/course` | Same as other `/api/tenant` routes (`tenant.resolve.token`, `auth:tenant_api`, …) | `CheckoutController::initializeCourseCheckout` |
 | `GET` | `/student-invoices/{id}` | same | `StudentInvoiceReadController::show` |
 | `GET` | `/student-invoices/{id}/download` | same | `StudentInvoiceReadController::download` |
 | `POST` | `/webhooks/payment` | *(none — verify in use case)* | `CheckoutController::handleWebhook` |
 
-> **Note:** Checkout and invoices use the **`auth:api`** + **`resolve.tenant`** stack from this file, not the default `auth:tenant_api` group middleware. Clients must match whatever guard the API expects for these endpoints.
+Checkout and student invoices **do not** add a separate guard in this file; they use the **standard tenant JWT pipeline** from [`backend/routes/api.php`](../../../../backend/routes/api.php) (`auth:tenant_api`, etc.). Clients should send the same **tenant API** Bearer token as for other tenant dashboard calls.
 
 ## Application layer
 
@@ -51,6 +51,10 @@ Webhook verification and payload parsing are **Razorpay-oriented** in `CheckoutC
 - `frontend/services/tenant-payment-service.ts` posts to **`/checkout/course`** (ensure API base URL includes `/api/tenant` if that is how the client is configured)
 
 ---
+
+## Document history
+
+- **2026-03-31:** Aligned payment routes with global `auth:tenant_api` stack (removed invalid `auth:api` / `resolve.tenant` inner group).
 
 ## Linked references
 

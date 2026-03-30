@@ -57,7 +57,8 @@ Use cases are wired from `BranchReadController` / `BranchWriteController` (see `
 
 ## 4. Frontend & integrations
 
-- No dedicated **`/api/tenant/branches`** client module was found under `frontend/services` at documentation time; branch context appears in **dashboard** (`tenant-dashboard-service` overview `branch_id`), **CRM** reports (`crmReportsApi` branch comparison), **fees**, **WhatsApp**, and **subscription plan limits** (`max_branches`). Treat **`branch.php`** as the contract for new UI.
+- **`API_ENDPOINTS.TENANT_BRANCH`** in [`frontend/config/api-endpoints.ts`](../../../../frontend/config/api-endpoints.ts); thin client in [`frontend/services/tenant-branch-service.ts`](../../../../frontend/services/tenant-branch-service.ts).
+- Branch context also appears in **dashboard** (`tenant-dashboard-service` overview `branch_id`), **CRM** reports (`crmReportsApi` branch comparison), **fees**, **WhatsApp**, and **subscription plan limits** (`max_branches`). **`branch.php`** remains the HTTP contract.
 
 ---
 
@@ -68,6 +69,8 @@ Use cases are wired from `BranchReadController` / `BranchWriteController` (see `
 | HTTP | `backend/app/Http/Controllers/Api/TenantAdminDashboard/Branch/` |
 | Routes | `backend/routes/tenant_dashboard/branch.php` |
 | Migrations | `backend/database/migrations/tenant/2026_03_17_210500_create_branches_table.php` (+ follow-ups) |
+| Frontend API | `frontend/config/api-endpoints.ts` — `TENANT_BRANCH` |
+| Frontend service | `frontend/services/tenant-branch-service.ts` |
 
 ---
 
@@ -75,3 +78,4 @@ Use cases are wired from `BranchReadController` / `BranchWriteController` (see `
 
 - Confirmed **`is_active`** as `tinyInteger` and documented **`manager_user_id`** and **`user_branch_assignments`**.
 - Replaced vague “offline-center” wording with **route- and schema-accurate** descriptions.
+- **2026-03-30:** Centralized frontend API paths (`TENANT_BRANCH`) and `tenant-branch-service.ts`.

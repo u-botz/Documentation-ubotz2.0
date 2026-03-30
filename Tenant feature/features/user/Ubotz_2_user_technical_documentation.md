@@ -11,9 +11,10 @@ From `TenantCapabilitySeeder`:
 | Capability | Typical routes |
 |------------|----------------|
 | `user.view` | List, stats, show, export, subscriptions index, education/experience/occupations read |
-| `user.manage` | Create, update, toggle status, soft delete, verify, hard delete, impersonate, accept instructor request, financial patches, subscription grant/revoke, profile writes |
+| `user.invite` **or** `user.manage` | **`POST /users` (create)** — `tenant.capability.any` with pipe-separated codes `user.invite` and `user.manage` (at least one required) |
+| `user.manage` | Update, toggle status, soft delete, verify, hard delete, impersonate, accept instructor request, financial patches, subscription grant/revoke, profile writes, and all other mutating routes except create |
 
-**Note:** `user.invite` exists in the seeder; this file uses **`user.manage`** for several admin actions—align product docs with actual route middleware.
+**Create vs manage:** Staff roles can hold `user.invite` without `user.manage`. Create uses an OR check so invite-only roles may create users; all other user mutations still require `user.manage`.
 
 ## HTTP map (summary)
 
@@ -44,3 +45,9 @@ Controllers live under `App\Http\TenantAdminDashboard\User\` and `App\Http\Contr
 
 - **Roles** — `user_role_assignments` determines effective capabilities
 - **Tenant provisioning** — creates the initial owner user on the platform side
+
+## Document history
+
+| Date | Change |
+|------|--------|
+| 2026-03-31 | Documented `tenant.capability.any` on `POST /users` (`user.invite` or `user.manage`); other mutations remain `user.manage` only. |

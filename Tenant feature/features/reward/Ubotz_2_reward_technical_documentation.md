@@ -4,20 +4,23 @@
 
 Per-tenant **reward configuration** (points per event type) and an append-only **ledger** of point movements. Optional domain events when points are awarded. Routes: `backend/routes/tenant_dashboard/reward.php`.
 
-## Module
+## Module and capabilities
 
-- **`tenant.module:module.rewards`** gates the entire file.
+- **`tenant.module:module.rewards`** gates the entire file (subscription entitlement).
+- **`tenant.capability:reward.view`** — `GET /rewards/configs` (read reward type configuration).
+- **`tenant.capability:reward.manage`** — `PUT /rewards/configs/{type}` (update configuration).
+- **Ledger self-service** — `GET /rewards/history` and `GET /rewards/balance` use **module gate only**; responses are scoped to the authenticated user in the controller. Students receive `reward.view` on the default student role so they can read configs where needed; ledger routes do not add an extra capability middleware by design.
 
-**Capabilities:** The route file does **not** attach `tenant.capability:*`; only authenticated tenant context and module entitlement apply. Tighten with policies if product requires admin-only config.
+Capabilities are seeded in `TenantCapabilitySeeder` / migration `2026_03_31_000001_seed_store_and_reward_capabilities.php` and mapped in `TenantRoleCapabilitySeeder`.
 
 ## HTTP map (base `/api/tenant`)
 
-| Method | Path | Controller |
-|--------|------|--------------|
-| GET | `/rewards/configs` | `RewardConfigController::index` |
-| PUT | `/rewards/configs/{type}` | `RewardConfigController::update` — `{type}` is the reward type string |
-| GET | `/rewards/history` | `RewardLedgerController::index` — current user’s ledger |
-| GET | `/rewards/balance` | `RewardLedgerController::balance` — aggregated balance |
+| Method | Path | Controller | Capability |
+|--------|------|--------------|------------|
+| GET | `/rewards/configs` | `RewardConfigController::index` | `reward.view` |
+| PUT | `/rewards/configs/{type}` | `RewardConfigController::update` — `{type}` is the reward type string | `reward.manage` |
+| GET | `/rewards/history` | `RewardLedgerController::index` — current user’s ledger | (module only) |
+| GET | `/rewards/balance` | `RewardLedgerController::balance` — aggregated balance | (module only) |
 
 `RewardConfigController` resolves `tenant_id` from `X-Tenant-Id` header or `auth('tenant_api')->user()->tenant_id`.
 
@@ -41,10 +44,16 @@ Balance is derived from ledger sums (see `getBalance` in repository).
 
 ## Frontend
 
-No dedicated block in `api-endpoints.ts` at the time of writing; use the paths above or add constants alongside other tenant features.
+- **`API_ENDPOINTS.TENANT_REWARD`** in [`frontend/config/api-endpoints.ts`](../../../../frontend/config/api-endpoints.ts) (`configs`, `history`, `balance`).
+- [`frontend/services/tenant-reward-service.ts`](../../../../frontend/services/tenant-reward-service.ts) — thin wrappers for config and ledger calls.
 
 ---
 
 ## Linked references
 
 - **Quiz** — common source events for awarding points (callers invoke `AwardRewardPointsUseCase` where integrated)
+
+## Document history
+
+- **2026-03-30:** Centralized frontend API paths (`TENANT_REWARD`) and `tenant-reward-service.ts`.
+- **2026-03-31:** Documented `reward.view` / `reward.manage` on config routes; ledger remains module-only.

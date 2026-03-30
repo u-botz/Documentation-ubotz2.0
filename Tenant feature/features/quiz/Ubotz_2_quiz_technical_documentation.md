@@ -16,7 +16,7 @@ Assessment lifecycle: authoring (`quizzes`, questions, sections), student attemp
 | `quiz.publish` | Status transitions, close quiz |
 | `quiz.archive` | Archive (delete route) |
 
-**Student surface** (`/api/tenant/student/quizzes/...`) has **no** `tenant.capability` middleware in the route file; enforcement is in controllers/use cases (enrollment, access rules).
+**Student surface** (`/api/tenant/student/quizzes/...`) has **no** `tenant.capability` middleware in the route file — **by design**: student-facing quiz access is enforced in **controllers/use cases** (e.g. `QuizAccessServiceInterface::canAccess()`, enrollment, attempt ownership) rather than RBAC capability codes on the route.
 
 ## HTTP map (base `/api/tenant`)
 
@@ -66,6 +66,10 @@ Under `App\Application\TenantAdminDashboard\Quiz\UseCases\`:
 `frontend/config/api-endpoints.ts` → **`TENANT_QUIZ`** (admin quiz paths). Student quiz paths may be called directly from feature code (e.g. `/api/tenant/student/quizzes/...`).
 
 ---
+
+## Document history
+
+- **2026-03-31:** Documented rationale for student routes omitting `tenant.capability` (service-layer access checks).
 
 ## Linked references
 

@@ -17,7 +17,7 @@ Assignment routes are included from `backend/routes/tenant_dashboard/assignment.
   - `assignment.view`, `assignment.create`, `assignment.edit`, `assignment.delete`
   - `assignment_submission.grade`, `assignment_submission.retract` (where applied on routes)
 
-Student-facing submit/read endpoints are intentionally **not** wrapped in assignment capabilities (authenticated tenant user only); see comments in `assignment.php`.
+Student-facing **submit** and **read my submission** endpoints are intentionally **not** wrapped in assignment capabilities (authenticated tenant user only); see comments in `assignment.php`. The **student “my assignments”** aggregate listing (`GET /api/tenant/student/assignments`) uses **`assignment.view`** so only users who can see assignment metadata get the dashboard list; adjust RBAC if a product decision requires listing without that capability. **Retract** requires `assignment_submission.retract`; the **student** system role includes this capability so learners can withdraw pending work. Existing tenants deployed before this change may need `TenantRoleCapabilitySeeder` re-run or a manual `tenant_role_capabilities` row for student + `assignment_submission.retract`.
 
 ### Implemented routes (summary)
 
@@ -28,13 +28,14 @@ Student-facing submit/read endpoints are intentionally **not** wrapped in assign
 | `POST` | `/api/tenant/assignments` | `AssignmentWriteController@store` | `assignment.create` |
 | `PUT` | `/api/tenant/assignments/{assignmentId}` | `AssignmentWriteController@update` | `assignment.edit` |
 | `DELETE` | `/api/tenant/assignments/{assignmentId}` | `AssignmentWriteController@destroy` | `assignment.delete` |
-| `POST` | `/api/tenant/assignments/{assignmentId}/submit` | `AssignmentSubmissionWriteController@submit` | Body: `text_response`, `file_path` (see §5) |
+| `POST` | `/api/tenant/assignments/{assignmentId}/submit` | `AssignmentSubmissionWriteController@submit` | Body: `text_response`, optional `file_path`, optional multipart `file` (see §5) |
 | `GET` | `/api/tenant/assignments/{assignmentId}/my-submission` | `AssignmentSubmissionReadController@mySubmission` | |
 | `GET` | `/api/tenant/assignments/{assignmentId}/submissions` | `AssignmentSubmissionReadController@index` | `assignment.view` |
 | `POST` | `/api/tenant/assignments/submissions/{submissionId}/grade` | `AssignmentSubmissionWriteController@grade` | `assignment_submission.grade` |
-| `DELETE` | `/api/tenant/assignments/submissions/{submissionId}/retract` | `AssignmentSubmissionWriteController@retract` | `assignment_submission.retract` |
+| `DELETE` | `/api/tenant/assignments/submissions/{assignmentId}/retract` | `AssignmentSubmissionWriteController@retract` | `assignment_submission.retract` — path segment is the **assignment** id (not submission id); resolves the current user’s submission for that assignment |
+| `GET` | `/api/tenant/student/assignments` | `StudentAssignmentReadController@index` | `tenant.module:module.assignments` + `assignment.view`. Query: optional `status` (`not_submitted` \| `pending_review` \| `graded`), `search` (title/course), `page`, `per_page` (max 100). Paginated JSON `{ data, meta }` with computed status, deadline, course title, grade fields — see `ListStudentAssignmentsQuery`. Route file: `routes/tenant_dashboard/student_assignments.php`. |
 
-**Compatibility note:** `AssignmentSubmissionReadController@messages` exists for listing threaded messages, but **`assignment_messages` was dropped** (see §3) and `ListSubmissionMessagesQuery` always returns `[]`. A matching route is **not** registered in `assignment.php` at time of writing. The frontend `api-endpoints.ts` entry `MESSAGES` may not be wired end-to-end.
+There is **no** submission threaded-messages API: **`assignment_messages`** was dropped (see §3), and the former stub controller/query and `TENANT_ASSIGNMENT.MESSAGES` frontend constant have been removed.
 
 ---
 
@@ -43,7 +44,7 @@ Student-facing submit/read endpoints are intentionally **not** wrapped in assign
 | Class | Role |
 |-------|------|
 | `CreateAssignmentUseCase` | Creates `AssignmentEntity`, persists, audit `assignment.created`, dispatches `AssignmentCreated` |
-| `SubmitAssignmentUseCase` | Validates deadline, single submission per student, persists submission, audit, `AssignmentSubmitted`, dispatches `RecordStudentActivityJob` (MAS telemetry) on `low` queue |
+| `SubmitAssignmentUseCase` | Requires an **active** `course_enrollments` row for the student and assignment’s `course_id`; otherwise `AssignmentRequiresEnrollmentException`. Validates deadline via `AssignmentEntity::deadlineHasPassedFor`: for `days_after_enrollment`, the enrollment’s **`created_at`** (domain: `CourseEnrollmentProps::createdAt`) is the start of the window — consistent with `ListStudentAssignmentsQuery` deadline display. Then enforces single submission per student, persists, audit, `AssignmentSubmitted`, `RecordStudentActivityJob` on `low` queue |
 | `RetractSubmissionUseCase` | Soft-deletes submission while status allows retraction (`pending_review` only) |
 | `GradeSubmissionUseCase` | Applies grade vs `max_grade` / `pass_grade`, feedback, `AssignmentGraded`, optional `AssignmentPassed` |
 | `ListAllAssignmentsQuery` | All assignments for tenant |
@@ -51,7 +52,7 @@ Student-facing submit/read endpoints are intentionally **not** wrapped in assign
 | `GetAssignmentQuery` | Single assignment |
 | `ListAssignmentSubmissionsQuery` | Instructor list for an assignment |
 | `GetStudentSubmissionQuery` | Current user’s submission for an assignment |
-| `ListSubmissionMessagesQuery` | **Stub** — returns empty array (see §3) |
+| `ListStudentAssignmentsQuery` | Active enrollments → assignments for those courses → current user’s submissions; derives UI status (`not_submitted` / `pending_review` / `graded`), optional `status` and `search` filters; in-memory pagination via `paginate()` |
 
 Listeners (notifications): `NotifyInstructorOnSubmissionListener`, `NotifyStudentOnGradeListener` (under `Application\TenantAdminDashboard\Assignment\Listeners`).
 
@@ -124,16 +125,15 @@ Older prose referring to `submitted`, `under_review`, etc. does **not** match th
 
 - `none` → never passed by deadline.
 - `fixed_date` → compare to `deadline_at`.
-- `days_after_enrollment` → requires `enrolledAt` and `deadline_days` (if enrollment context is not passed, behavior follows implementation in `deadlineHasPassedFor`).
-
-**Note:** `SubmitAssignmentUseCase` calls `deadlineHasPassedFor(null, …)`, so **days-after-enrollment** deadlines may not evaluate as intended until enrollment time is wired in — verify product behavior if that mode is used.
+- `days_after_enrollment` → requires `enrolledAt` and `deadline_days`; **`SubmitAssignmentUseCase`** passes the student’s course enrollment **`created_at`** (see `CourseEnrollmentProps::createdAt`) into `deadlineHasPassedFor`.
 
 ---
 
 ## 5. Request payloads & files
 
-- **`SubmitAssignmentRequest`**: `text_response` (optional string), `file_path` (optional string, max 500) — at least one required.
-- Controllers do **not** map multipart file uploads to storage in the snippet above; clients typically supply a **tenant-scoped file path** from the file manager (or a future upload pipeline). Align frontend `FormData` usage with whatever upload endpoint produces `file_path`.
+- **`SubmitAssignmentRequest`**: `text_response` (optional string), `file_path` (optional string, max 500), `file` (optional uploaded file: max 10 MB; MIME whitelist includes common documents and images — see validation rules). **At least one** of non-empty `text_response`, `file_path`, or valid `file` upload is required.
+- If `file` is present, the HTTP layer stores it via **`StoreAssignmentSubmissionFileService`** (tenant-scoped path under `tenants/{tenantId}/users/{userId}/assignment_submissions/…` on the public disk) and passes the resulting **path string** into `SubmitAssignmentUseCase` as `file_path`. If both `file_path` and `file` are sent, the **uploaded file** wins.
+- Clients that already have a path (e.g. from another upload pipeline) may still send `file_path` only without `file`.
 
 ---
 
@@ -143,7 +143,7 @@ Older prose referring to `submitted`, `under_review`, etc. does **not** match th
 - Repositories scope by **`tenant_id`** on submissions (`EloquentAssignmentSubmissionRepository`).
 - Do not query submissions by primary key alone without `tenant_id` in tenant context.
 
-Capability checks on routes are the primary **authorization** gate for staff; submission endpoints rely on authenticated identity plus use-case rules (e.g. grade by submission id within tenant).
+Capability checks on routes are the primary **authorization** gate for staff; **submit** relies on authenticated identity plus use-case rules (e.g. one submission per student per assignment). **Retract** is gated by `assignment_submission.retract` (students hold this on the default student role after seeding).
 
 ---
 
@@ -151,15 +151,15 @@ Capability checks on routes are the primary **authorization** gate for staff; su
 
 | Area | Location |
 |------|----------|
-| API paths | `frontend/config/api-endpoints.ts` — `TENANT_ASSIGNMENTS` (`BASE`, `BY_CHAPTER`, `SUBMIT`, `SUBMISSIONS`, `GRADE`, `MESSAGES`, …) |
+| API paths | `frontend/config/api-endpoints.ts` — `TENANT_ASSIGNMENT` (`BASE`, `BY_CHAPTER`, `SUBMIT`, `RETRACT`, `SUBMISSIONS`, `GRADE`, `STUDENT_MY_ASSIGNMENTS`, …) |
 | Tenant admin (course builder) | `frontend/features/tenant-admin/courses/components/assignment-*.tsx` — form, manager, submissions list, grading modal |
 | Student submission | `frontend/features/student/assignments/assignment-submission-page.tsx`, `frontend/services/student-assignment-service.ts` |
 
 **Integration notes:**
 
-- `studentAssignmentService.getMyAssignments` calls `/tenant/student/assignments` with a fallback empty list if missing — that aggregate listing route may not exist in `backend/routes`; confirm before relying on “my assignments” dashboard.
-- Retract: service uses `DELETE /api/tenant/assignments/{id}/my-submission`; backend registers **`DELETE …/submissions/{submissionId}/retract`**. Align paths/parameters when hardening the feature.
-- Submit: service posts multipart to `submit`; backend validation expects `text_response` / `file_path` — ensure upload flow supplies `file_path` or extend the API to accept uploads consistently.
+- `studentAssignmentService.getMyAssignments` calls `API_ENDPOINTS.TENANT_ASSIGNMENT.STUDENT_MY_ASSIGNMENTS` → **`GET /api/tenant/student/assignments`**, matching the backend. Errors surface to the caller (no silent empty fallback).
+- **Retract** uses `DELETE` via `API_ENDPOINTS.TENANT_ASSIGNMENT.RETRACT(assignmentId)` → `/api/tenant/assignments/submissions/{assignmentId}/retract`, matching the backend.
+- **Submit** posts multipart `FormData` with `text_response` and optional `file`; the backend accepts multipart `file` and persists a tenant-scoped `file_path`.
 
 ---
 
@@ -168,14 +168,17 @@ Capability checks on routes are the primary **authorization** gate for staff; su
 | Layer | Path |
 |-------|------|
 | Domain | `backend/app/Domain/TenantAdminDashboard/Assignment/` |
-| Application | `backend/app/Application/TenantAdminDashboard/Assignment/` |
+| Application | `backend/app/Application/TenantAdminDashboard/Assignment/` (includes `Services/StoreAssignmentSubmissionFileService` for submit uploads) |
 | HTTP | `backend/app/Http/Controllers/Api/TenantAdminDashboard/Assignment/` |
 | Requests | `backend/app/Http/Requests/TenantAdminDashboard/Assignment/` |
 | Persistence | `backend/app/Infrastructure/Persistence/TenantAdminDashboard/Assignment/` |
-| Routes | `backend/routes/tenant_dashboard/assignment.php` |
+| Routes | `backend/routes/tenant_dashboard/assignment.php`, `backend/routes/tenant_dashboard/student_assignments.php` |
 
 ---
 
 ## 9. Document history
 
 - Prior versions described `assignment_messages` and a richer submission status model; schema and domain were **remediated** in March 2026 migrations — this document replaces those assumptions where they conflict with the repository.
+- **March 2026:** Student retract URL and multipart submit aligned with backend; `assignment_submission.retract` added to default student role; retract route parameter documented as `{assignmentId}`.
+- **March 2026:** **`GET /api/tenant/student/assignments`** implemented (`StudentAssignmentReadController`, `ListStudentAssignmentsQuery`); frontend uses `STUDENT_MY_ASSIGNMENTS` under `/api/tenant/...`.
+- **March 2026:** Removed dead submission **messages** stub (`ListSubmissionMessagesQuery`, `AssignmentSubmissionReadController@messages`, `TENANT_ASSIGNMENT.MESSAGES`); aligned docs with **enrollment-based** deadline evaluation in `SubmitAssignmentUseCase`.

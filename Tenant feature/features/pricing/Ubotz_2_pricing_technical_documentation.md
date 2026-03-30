@@ -12,7 +12,12 @@ Per-**course** discount **tickets** (coupon-style) and time-bounded **special of
 
 **Base path:** `/api/tenant/pricing` (with global `/api/tenant` prefix).
 
-**Capability middleware:** The `pricing` group does **not** add `tenant.capability:*` in the route file; access relies on **`module.lms`** and controller/context behavior. Tighten with policies if product requires role-based separation.
+**Capability middleware:** Inside the same `module.lms` wrapper as the rest of `course.php`, each pricing route adds:
+
+- **`tenant.capability:course.view`** — ticket/offer **GET** and ticket **validate**.
+- **`tenant.capability:course.edit`** — ticket/offer **POST**, **PUT**, **DELETE**.
+
+There is no separate `pricing.*` capability; course-scoped pricing follows course RBAC.
 
 ## HTTP map
 
@@ -54,6 +59,10 @@ Later migrations extend behavior (e.g. **`ticket_user_groups`** `2026_03_09_1627
 ## Frontend
 
 `frontend/config/api-endpoints.ts` → **`TENANT_COURSE`**: `COURSE_TICKETS`, `TICKET_DETAIL`, `VALIDATE_TICKET`, `COURSE_OFFERS`, `OFFER_DETAIL` (paths match the routes above).
+
+## Document history
+
+- **2026-03-31:** Documented `course.view` / `course.edit` on all pricing routes.
 
 ---
 

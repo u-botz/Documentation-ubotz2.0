@@ -13,7 +13,7 @@ Weighted **performance** views, **batch** views, **topic mastery**, **self-servi
 | `student_analytics.configure` | `GET`/`PUT /api/tenant/analytics/config` |
 | `student_analytics.view` | All other `/analytics/*` read endpoints below |
 
-**Self-service:** `/api/tenant/my-analytics` has **no** capability middleware in the route file—only the module gate; any extra checks must live in controllers/use cases.
+**Self-service (`/my-analytics`):** These routes intentionally omit `tenant.capability:*` — only **`tenant.module:module.student_analytics`** applies. Responses are scoped to the **authenticated user** in `MyAnalyticsController` / use cases (no cross-student admin reads on this prefix). Admin/instructor analytics under `/analytics/*` continues to require `student_analytics.view` or `student_analytics.configure` as listed above.
 
 ## HTTP map (base `/api/tenant`)
 
@@ -55,6 +55,10 @@ Listeners react to domain events (e.g. quiz finalized, attendance marked, assign
 Add paths under `/api/tenant/analytics` and `/api/tenant/my-analytics` in `api-endpoints.ts` if not already centralized.
 
 ---
+
+## Document history
+
+- **2026-03-31:** Clarified self-service vs admin capability routing for `my-analytics`.
 
 ## Linked references
 

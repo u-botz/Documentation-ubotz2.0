@@ -10,8 +10,7 @@ Product teams use the hierarchy to drive **analytics** (“weak topics”) and *
 
 ## Administration
 
-- **Exams** can be created, updated, and deleted (subject to downstream FK usage) via tenant APIs with **`exam.manage`**.
-- **Lower levels** (subjects, chapters, topics) are exposed as **list** endpoints in the current API surface for **selection** and **filtering**; confirm roadmap if full CRUD for every level is required in-app.
+- **Exams**, **subjects**, **chapters**, and **topics** support **full CRUD** under `/api/tenant/admin/exam-hierarchy` with **`exam.view`** (reads) and **`exam.manage`** (writes). Deletes that would orphan **question bank** rows are rejected (HTTP 409); database cascades apply when deleting subjects/chapters that own child rows without bank references.
 
 ---
 

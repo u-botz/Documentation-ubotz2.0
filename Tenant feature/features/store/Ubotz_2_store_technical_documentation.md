@@ -10,19 +10,28 @@ Tenant **product catalog** (categories, products, translations, media files, FAQ
 |------|---------------------|
 | `backend/routes/tenant_dashboard/store.php` | `/api/tenant/store` |
 
-The route group does **not** add `tenant.module` or `tenant.capability` middleware in this file; authorization relies on the surrounding **tenant API** middleware (`auth:tenant_api`, etc.) and controller/use-case checks.
+### Module and capabilities
+
+- **`tenant.module:module.lms`** — Store is part of the core LMS surface area; there is no separate `module.store` in `ModuleCode` today.
+- **`tenant.capability:store.view`** — `GET` on categories, products, orders (browse catalog and read orders).
+- **`tenant.capability:store.manage`** — Mutations: category/product create/update/delete, product details/inventory updates, FAQ and file CRUD, ship and confirm-delivery.
+
+Capabilities are seeded in `TenantCapabilitySeeder` / migration `2026_03_31_000001_seed_store_and_reward_capabilities.php` and assigned to default system roles (`owner`/`admin` full `store.*`; `teacher`/`staff` view-only where listed in `TenantRoleCapabilitySeeder`).
 
 ## HTTP map
 
-Nested `Route::prefix('store')->name('store.')`:
+Nested `Route::middleware(['tenant.module:module.lms'])->prefix('store')->name('store.')`:
 
-| Area | Pattern | Notes |
-|------|---------|--------|
-| Categories | `apiResource('categories', ProductCategoryController)` | Standard REST |
-| Products | `apiResource('products', ProductController)` + `PUT products/{product}/details`, `PUT products/{product}/inventory` | |
-| FAQs | `apiResource('faqs', ProductFaqController)->except(['index','show'])` | |
-| Files | `apiResource('files', ProductFileController)->except(['index','show'])` | |
-| Orders | `apiResource('orders', ProductOrderController)->only(['index','show'])` + `POST orders/{order}/ship`, `POST orders/{order}/confirm-delivery` | |
+| Area | Pattern | Capability |
+|------|---------|------------|
+| Categories | `index`, `show` | `store.view` |
+| Categories | `store`, `update`, `destroy` | `store.manage` |
+| Products | `index`, `show` | `store.view` |
+| Products | `store`, `update`, `destroy`, `PUT .../details`, `PUT .../inventory` | `store.manage` |
+| FAQs | `apiResource` except `index`/`show` | `store.manage` |
+| Files | `apiResource` except `index`/`show` | `store.manage` |
+| Orders | `index`, `show` | `store.view` |
+| Orders | `POST .../ship`, `POST .../confirm-delivery` | `store.manage` |
 
 ## Application use cases (examples)
 
@@ -38,7 +47,8 @@ Nested `Route::prefix('store')->name('store.')`:
 
 ## Frontend
 
-No dedicated `STORE` block was present in `frontend/config/api-endpoints.ts` at documentation time; clients call `/api/tenant/store/...` paths implied above.
+- **`API_ENDPOINTS.TENANT_STORE`** in [`frontend/config/api-endpoints.ts`](../../../../frontend/config/api-endpoints.ts) (categories, products, FAQs, files, orders, ship / confirm-delivery).
+- [`frontend/services/tenant-store-service.ts`](../../../../frontend/services/tenant-store-service.ts) — thin CRUD/fulfillment wrappers.
 
 ---
 
@@ -46,3 +56,8 @@ No dedicated `STORE` block was present in `frontend/config/api-endpoints.ts` at 
 
 - **Payment** — checkout for store orders (where integrated)
 - **File manager** — assets linked to digital products
+
+## Document history
+
+- **2026-03-30:** Centralized frontend API paths (`TENANT_STORE`) and `tenant-store-service.ts`.
+- **2026-03-31:** Documented `module.lms`, `store.view`, `store.manage` route gating.

@@ -33,14 +33,14 @@ Includes: `navigation`, `theme`, `pages` + homepage + slug, `courses` + detail +
 
 ## Data model (tenant)
 
-Core tables evolved via migrations such as:
+The runtime table is **`tenant_landing_pages`** (not `landing_pages`). The original create migration `2026_03_13_154702_create_landing_pages_table.php` introduced `tenant_id` and nullable `template_id` without a foreign key to the platform catalog. **`2026_03_14_051146_rename_and_alter_landing_pages_table.php`** renames the table to **`tenant_landing_pages`**, renames **`template_id` → `source_template_id`**, and adds page fields (`title`, `slug`, `is_homepage`, SEO columns, `color_overrides`, etc.).
 
-- `2026_03_13_154702_create_landing_pages_table.php` — `tenant_id`, nullable `template_id` (**no FK** — ids reference the central template catalog), `branding` / `seo_config` JSON, `status`, `published_at`
-- `2026_03_13_154703_create_landing_page_sections_table.php` — section payloads for pages
-- Later renames/alters: `2026_03_14_051127_*`, `051128_*`, media table create/drop/rename cycles — use current schema from latest migrations
-- `2026_03_19_100000_add_template_slug_to_tenant_landing_pages.php`, `2026_03_21_100300_seed_tenant_website_settings_from_landing_pages.php`
+Related migrations:
 
-`template_id` is intentionally not a MySQL foreign key to the central DB; application services validate template availability.
+- `2026_03_13_154703_create_landing_page_sections_table.php` — section payloads (FK targets evolved with table renames; see current migrations)
+- Later alters: media tables, `2026_03_19_100000_add_template_slug_to_tenant_landing_pages.php`, `2026_03_21_100300_seed_tenant_website_settings_from_landing_pages.php`
+
+**Cross-database FK:** `source_template_id` is **not** a MySQL foreign key to the central template table (templates live in the **central** database; tenant data is in the **tenant** database). **Referential integrity** is enforced in application code — e.g. **`CloneTemplateUseCase`** loads the template via **`LandingPageTemplateRepositoryInterface::findByIdOrFail`** before cloning. A bad or stale `source_template_id` stored manually would surface as missing template or inconsistent public rendering, not as a DB-level FK violation.
 
 ## Frontend configuration
 

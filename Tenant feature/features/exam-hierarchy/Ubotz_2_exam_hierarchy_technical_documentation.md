@@ -2,7 +2,7 @@
 
 The exam hierarchy models a **syllabus tree**: **exam → subject → chapter → topic**, used to tag **courses** and **question bank** content. It is **not** the same as **commercial categories** (`categories` with recursive `parent_id`).
 
-Tables live in the **tenant** database. Domain/application code under `App\Domain\TenantAdminDashboard\ExamHierarchy` and `App\Application\TenantAdminDashboard\ExamHierarchy\Queries` (list queries).
+Tables live in the **tenant** database. Domain/application code under `App\Domain\TenantAdminDashboard\ExamHierarchy` and `App\Application\TenantAdminDashboard\ExamHierarchy\` (queries, commands, use cases).
 
 ---
 
@@ -10,7 +10,7 @@ Tables live in the **tenant** database. Domain/application code under `App\Domai
 
 Routes: `backend/routes/tenant_dashboard/exam_hierarchy.php` → prefix **`/api/tenant/admin/exam-hierarchy`**.
 
-**Capabilities:** **`exam.view`** (reads), **`exam.manage`** (exam writes).
+**Capabilities:** **`exam.view`** (GET list and GET by id), **`exam.manage`** (POST create, PUT update, DELETE).
 
 | Method | Path | Middleware |
 |--------|------|------------|
@@ -19,12 +19,28 @@ Routes: `backend/routes/tenant_dashboard/exam_hierarchy.php` → prefix **`/api/
 | `PUT` | `/exams/{exam_id}` | `exam.manage` |
 | `DELETE` | `/exams/{exam_id}` | `exam.manage` |
 | `GET` | `/subjects` | `exam.view` |
+| `GET` | `/subjects/{id}` | `exam.view` |
+| `POST` | `/subjects` | `exam.manage` |
+| `PUT` | `/subjects/{id}` | `exam.manage` |
+| `DELETE` | `/subjects/{id}` | `exam.manage` |
 | `GET` | `/chapters` | `exam.view` |
+| `GET` | `/chapters/{id}` | `exam.view` |
+| `POST` | `/chapters` | `exam.manage` |
+| `PUT` | `/chapters/{id}` | `exam.manage` |
+| `DELETE` | `/chapters/{id}` | `exam.manage` |
 | `GET` | `/topics` | `exam.view` |
+| `GET` | `/topics/{id}` | `exam.view` |
+| `POST` | `/topics` | `exam.manage` |
+| `PUT` | `/topics/{id}` | `exam.manage` |
+| `DELETE` | `/topics/{id}` | `exam.manage` |
 
-**Important:** At the time of writing, **only `exams`** expose **create/update/delete** in this route file. **`subjects`**, **`chapters`**, and **`topics`** are **list/index** endpoints (with query params such as `exam_id` on subjects — see `SubjectController`). If your product needs CRUD for lower levels, confirm whether another route file or admin tool provides it.
+**List query params:** `subjects` — optional `exam_id`, `per_page`; `chapters` — optional `subject_id`, `per_page`; `topics` — optional `chapter_id`, `per_page`.
 
-**Frontend:** `frontend/config/api-endpoints.ts` — `TENANT_EXAM_HIERARCHY.*` under `/api/tenant/admin/exam-hierarchy/...`.
+**Deletes:** Deleting a **subject** cascades to **exam_chapters** and **exam_topics** at the database level (`ON DELETE CASCADE`). Deletes are **blocked** (HTTP **409**) when **`question_bank`** rows still reference the node or any chapter/topic beneath it (application guard — `question_bank` has no FK to hierarchy tables). **`courses`** reference hierarchy columns with **ON DELETE SET NULL**; deletes are not blocked solely for course references.
+
+**Subject slug on update:** `SubjectEntity::update` does not change **slug** (immutable after create in v1); same pattern as chapters/topics.
+
+**Frontend:** `frontend/config/api-endpoints.ts` — `TENANT_EXAM_HIERARCHY.*` — collection URLs double as **POST** create targets; `*_DETAIL(id)` is used for GET show, PUT, DELETE.
 
 ---
 
@@ -66,7 +82,9 @@ Later migrations may add **`category_id`**, **`batch_id`**, etc. — see `2026_0
 | Layer | Path |
 |-------|------|
 | HTTP | `backend/app/Http/TenantAdminDashboard/ExamHierarchy/Controllers/` |
+| Application | `backend/app/Application/TenantAdminDashboard/ExamHierarchy/` |
 | Queries | `backend/app/Application/TenantAdminDashboard/ExamHierarchy/Queries/` |
+| Deletion guard | `App\Domain\TenantAdminDashboard\ExamHierarchy\Repositories\ExamHierarchyDeletionGuardInterface` |
 | Routes | `backend/routes/tenant_dashboard/exam_hierarchy.php` |
 
 ---
@@ -74,5 +92,6 @@ Later migrations may add **`category_id`**, **`batch_id`**, etc. — see `2026_0
 ## 5. Document history
 
 - Aligned route prefix **admin/exam-hierarchy** and capabilities **`exam.view`** / **`exam.manage`**.
-- Documented **read-only** nature of subject/chapter/topic routes in `exam_hierarchy.php` vs **exam** CRUD.
+- **2026-03-30:** Documented full **CRUD** for subjects, chapters, topics; **`question_bank`** delete guard; cascade behavior; frontend endpoint note.
 - Noted **nullable `exam_id`** on subjects and follow-up migrations on `exams`.
+- Replaced obsolete “read-only lower levels” wording.

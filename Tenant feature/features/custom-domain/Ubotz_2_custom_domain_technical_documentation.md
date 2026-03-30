@@ -2,7 +2,7 @@
 
 Custom domains allow a tenant to map a **branded hostname** to the platform after **DNS verification**. Tenant-facing APIs live under `App\Http\Controllers\TenantAdminDashboard\CustomDomain`; application use cases under `App\Application\TenantAdminDashboard\CustomDomain`.
 
-**Platform-wide routing** may also use central tables (e.g. **`tenant_domain_mappings`** with **unique** `domain` in the central DB) for ingress resolution — the tenant migration below stores **per-tenant** verification state in the **tenant** database.
+**Central DB:** `tenant_domain_mappings` defines a **unique** `domain` column (see central migration `2026_03_13_154701_create_tenant_domain_mappings_table.php`), but **no application services in `backend/app` currently read or write this model** (`TenantDomainMappingRecord` is unused). Treat it as **reserved / future ingress routing**, not as today’s enforcement of hostname ownership. **Authoritative verification state** for a tenant’s custom domain lives in **`tenant_custom_domains`** (tenant DB), described below.
 
 ---
 
@@ -37,10 +37,16 @@ Migration: `2026_03_14_075524_create_tenant_custom_domains_table.php` — table 
 | `dns_failure_detected_at`, `deactivated_at`, `removed_at` | Failure / teardown |
 | `deactivation_reason` | Short code/string |
 | `last_dns_check_at` | Last automated or manual check |
+| `domain_active_key` | **(Added in `2026_03_30_231500_add_domain_active_key_unique_to_tenant_custom_domains.php`.)** Stored generated column: equals `domain` when `removed_at IS NULL`, otherwise `NULL`. Used only to support a partial uniqueness rule at the DB layer (see below). Not application-managed. |
 
-Indexes: `idx_tcd_status`, `idx_tcd_deadline`, `idx_tcd_dns_failure`.
+Indexes: `idx_tcd_status`, `idx_tcd_deadline`, `idx_tcd_dns_failure`, and **`UNIQUE(domain_active_key)`** (unique index name `tenant_custom_domains_domain_active_key_unique`).
 
-The migration does **not** add a **unique** index on `domain` at the DB level; global hostname uniqueness may be enforced in **application logic** and/or the **central** `tenant_domain_mappings` table — verify `AddCustomDomainUseCase` / repository before assuming DB-only uniqueness.
+### Invariants (application + DB)
+
+- **At most one non-removed custom domain per tenant:** `CustomDomainRepositoryInterface::findByTenantId` returns the active row (`whereNull('removed_at')`); `AddCustomDomainUseCase` rejects if the tenant already has any such row.
+- **Global hostname among “active” rows:** At most **one** row with `removed_at IS NULL` may use a given `domain` string (enforced by **`domain_active_key` + UNIQUE** — multiple soft-deleted rows may share the same historical `domain` because their `domain_active_key` is `NULL`, which does not collide under MySQL/SQLite unique semantics).
+- **Cooldown on reuse:** `EloquentCustomDomainRepository::isDomainAvailable` blocks registering a hostname that was **removed within the last 24 hours** (application-only; not expressed as a CHECK constraint).
+- **Races:** `AddCustomDomainUseCase` checks availability inside a transaction; concurrent requests can still pass the check until insert. **`UNIQUE(domain_active_key)`** is the final guard. On duplicate insert/update, `EloquentCustomDomainRepository::save` maps the driver’s unique-constraint error to **`DomainAlreadyClaimedException`**.
 
 ---
 
@@ -83,3 +89,4 @@ Landing routes include **`GET /api/public/tenants/{tenantSlug}/website/custom-do
 - Aligned capability names with **`custom_domain.view`** / **`custom_domain.manage`** (not generic “router” prose alone).
 - Documented **`VerifyCustomDomainDnsUseCase`**, **config CNAME target**, and **tenant vs central** uniqueness caveat.
 - Removed reliance on unverified cron/job class names unless present in repo.
+- Documented **`domain_active_key`**, **UNIQUE** enforcement, **invariants**, **race backstop**, and clarified that **`tenant_domain_mappings` is not wired in application code** today.

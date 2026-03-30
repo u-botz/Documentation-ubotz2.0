@@ -19,7 +19,9 @@ Scheduling for hosts (availability, overrides), booking flows (instant book vs r
 | `meeting.view_all` | `/meetings/admin/bookings`, `/meetings/admin/stats` |
 | *(none on student group)* | `/meetings/student/*` — exposed to authenticated tenant users per controller/policy logic |
 
-Student routes have **no** `tenant.capability` middleware in the route file; authorization is enforced inside controllers/use cases (e.g. requester vs host).
+### Authorization: student routes (by design)
+
+Student routes **`/meetings/student/*`** intentionally omit `tenant.capability:*` middleware. Access control is **not** absent: it is enforced in **application use cases** (e.g. requester vs host, booking ownership, slot availability) inside `MeetingStudentController` and related use cases. This avoids assigning a dedicated “student meeting” capability to every student role while still preventing cross-tenant and cross-user data access when implemented correctly.
 
 ## HTTP map (summary)
 
@@ -58,6 +60,10 @@ Single migration bundle: `backend/database/migrations/tenant/2026_03_18_120000_c
 - `meeting:auto-complete` — daily at `00:30`
 
 ---
+
+## Document history
+
+- **2026-03-31:** Clarified student-route authorization model (no route-level capability; use-case enforcement).
 
 ## Linked references
 

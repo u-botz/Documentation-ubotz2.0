@@ -12,16 +12,16 @@ This feature is **tenant-scoped subscription plans** used to **sell or grant tim
 
 | Method | Path | Capability |
 |--------|------|------------|
-| GET | `/subscription-plans` | `subscription.manage` (group middleware) |
+| GET | `/subscription-plans` | `subscription.view` |
+| GET | `/subscription-plans/{planId}` | `subscription.view` |
 | POST | `/subscription-plans` | `subscription.manage` |
-| POST | `/subscription-plans/enroll` | `subscription.manage` **and** `subscription.enroll` |
-| GET | `/subscription-plans/{planId}` | `subscription.manage` |
 | PUT | `/subscription-plans/{planId}` | `subscription.manage` |
 | DELETE | `/subscription-plans/{planId}` | `subscription.manage` |
+| POST | `/subscription-plans/enroll` | `subscription.manage` **and** `subscription.enroll` |
 
 Controllers: `SubscriptionPlanReadController`, `SubscriptionPlanWriteController`, invokable `EnrollSubscriptionPlanController` → `ActivateSubscriptionUseCase` with `ActivateSubscriptionCommand` (`user_id`, `plan_id`).
 
-**Note:** `TenantCapabilitySeeder` also defines **`subscription.view`** for read-only plan/enrollment visibility; this route file currently attaches **`subscription.manage`** to **all** plan routes—product may add read routes or policy checks separately if view-without-manage is required.
+**Read vs write:** Listing and showing plans require **`subscription.view`** only. Creating, updating, deleting plans requires **`subscription.manage`**. Custom roles that have **`subscription.manage`** without **`subscription.view`** will not pass GET routes — grant both when assigning catalog editors.
 
 ## Persistence (tenant)
 
@@ -41,6 +41,10 @@ Enrollment storage is handled by subscription domain repositories used from `Act
 ## Frontend
 
 Per-user grant/revoke helpers may appear under **user** APIs (e.g. `TENANT_USER.GRANT_SUBSCRIPTION` in `api-endpoints.ts`); that is a different surface from CRUD on `subscription-plans`.
+
+## Document history
+
+- **2026-03-31:** Split GET plan routes to `subscription.view`; writes remain `subscription.manage`.
 
 ---
 

@@ -57,7 +57,7 @@ Tests assert **custom page slugs** cannot collide with reserved **landing page**
 
 - **Indexing:** `(tenant_id, status)` supports admin lists and public lookups.
 - **Caching:** Do not assume **Redis** invalidation for every deployment; confirm any cache layer in `PublicPageQuery` / read models before documenting SLAs.
-- **XSS:** Sanitize or allowlist HTML in the **write** path and escape in **renderers** as implemented — verify `TenantCustomPageWriteController` / requests for the actual strategy (do not rely on unverified third-party names like “Kysely Purifier” unless present in code).
+- **XSS:** **`CreateCustomPageUseCase`** / **`UpdateCustomPageUseCase`** sanitize **`body`** via **`HtmlSanitizerInterface`** (**`HtmlPurifierSanitizer`**, **`ezyang/htmlpurifier`**) with the same allowlist as blog admin comments. Public/SPA output should still use safe rendering practices.
 
 ---
 
@@ -75,3 +75,4 @@ Tests assert **custom page slugs** cannot collide with reserved **landing page**
 ## 7. Document history
 
 - Removed unverified **middleware class name**, **Redis** guarantee, and **Kysely** reference; aligned with **`landing_page.php`**, migration, and **`EloquentPublicPageQuery`**.
+- Documented **HTMLPurifier**-based write-path sanitization for custom page body.

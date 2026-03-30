@@ -6,25 +6,58 @@ This document reflects the **current** Laravel implementation. Application orche
 
 ## 1. HTTP surface
 
-Routes: `backend/routes/tenant_dashboard/attendance.php`, mounted under the authenticated **`/api/tenant`** group in `backend/routes/api.php` (same middleware stack as other tenant dashboard APIs).
+Routes: `backend/routes/tenant_dashboard/attendance.php`, mounted under the authenticated **`/api/tenant`** group in `backend/routes/api.php` (same middleware stack as other tenant dashboard APIs: `tenant.resolve.token`, `auth:tenant_api`, `tenant.active`, etc.).
 
-**Prefix:** `/api/tenant/attendance`
+This route file does **not** wrap all paths in `tenant.module:module.erp.attendance`. Capability checks use **`attendance.view`** and **`attendance.manage`**, which are unlocked for tenants that have entitlement **`module.erp.attendance`** via `ModuleCapabilityMap` + `TenantCapabilityChecker` (see §4).
 
-| Method | Path | Controller | Purpose |
-|--------|------|------------|---------|
-| `GET` | `sessions` | `AttendanceSessionReadController@index` | List sessions |
-| `POST` | `sessions` | `AttendanceSessionWriteController@store` | Create (e.g. ad-hoc) session |
-| `GET` | `sessions/{id}` | `AttendanceSessionReadController@show` | Session detail |
-| `POST` | `sessions/{id}/mark` | `AttendanceRecordWriteController@bulkMark` | Bulk mark roster |
-| `POST` | `sessions/{id}/complete` | `AttendanceSessionWriteController@complete` | Complete session (sign-off) |
-| `PATCH` | `records/{id}` | `AttendanceRecordWriteController@update` | Update one record |
-| `POST` | `records/{id}/override` | `AttendanceRecordWriteController@override` | Override after lock (capability-gated) |
-| `GET` | `settings` | `AttendanceSettingsReadController@show` | Tenant attendance settings |
-| `PUT` | `settings` | `AttendanceSettingsWriteController@update` | Update settings |
+### 1.1 Core — prefix `/api/tenant/attendance`
 
-**Commented out (not exposed):** student/staff reports, staff attendance CRUD, record audit GET, and self-service `my/attendance` routes — see the same file for the exact list.
+| Method | Path (relative to prefix) | Controller | Notes |
+|--------|---------------------------|------------|--------|
+| `GET` | `sessions` | `AttendanceSessionReadController@index` | `attendance.view` enforced in `ListAttendanceSessionsQuery` |
+| `POST` | `sessions` | `AttendanceSessionWriteController@store` | `attendance.manage` in use case |
+| `GET` | `sessions/{id}` | `AttendanceSessionReadController@show` | Tenant-scoped fetch only — **no** `attendance.view` check in controller (align with product if stricter RBAC is required). |
+| `POST` | `sessions/{id}/mark` | `AttendanceRecordWriteController@bulkMark` | `attendance.manage` in `BulkMarkAttendanceUseCase` |
+| `POST` | `sessions/{id}/complete` | `AttendanceSessionWriteController@complete` | `attendance.manage` |
+| `PATCH` | `records/{id}` | `AttendanceRecordWriteController@update` | `attendance.manage` |
+| `POST` | `records/{id}/override` | `AttendanceRecordWriteController@override` | `attendance.manage` |
+| `GET` | `settings` | `AttendanceSettingsReadController@show` | Authenticated tenant user; **no** capability middleware on controller (read is open within tenant auth). |
+| `PUT` | `settings` | `AttendanceSettingsWriteController@update` | `attendance.manage` |
 
-There is **no** `tenant.module` or `tenant.capability` middleware on these routes in `attendance.php`; **authorization** is enforced inside use cases via `TenantCapabilityCheckerInterface` (see §4).
+### 1.2 Student summary & reports — same prefix
+
+| Method | Path | Controller | Middleware / auth |
+|--------|------|------------|-------------------|
+| `GET` | `students/{id}/summary` | `StudentAttendanceReadController@summary` | Caller may read **own** `{id}` without `attendance.view`; viewing another student’s summary requires `attendance.view` (see controller). |
+| `GET` | `reports/batch/{id}` | `StudentAttendanceReadController@batchReport` | `tenant.capability:attendance.view` |
+| `GET` | `reports/low-attendance` | `StudentAttendanceReadController@lowAttendance` | `tenant.capability:attendance.view` |
+| `GET` | `reports/teacher-compliance` | `StudentAttendanceReadController@teacherCompliance` | `tenant.capability:attendance.view` |
+| `GET` | `reports/export` | `StudentAttendanceReadController@export` | `tenant.capability:attendance.view` |
+
+### 1.3 Staff attendance — same prefix
+
+| Method | Path | Controller | Middleware |
+|--------|------|------------|------------|
+| `GET` | `staff` | `StaffAttendanceReadController@index` | `tenant.capability:attendance.view` |
+| `GET` | `staff/reports` | `StaffAttendanceReadController@report` | `tenant.capability:attendance.view` |
+| `POST` | `staff/mark` | `StaffAttendanceWriteController@bulkMark` | `tenant.capability:attendance.manage` |
+| `PATCH` | `staff/{id}` | `StaffAttendanceWriteController@update` | `tenant.capability:attendance.manage` |
+
+### 1.4 Self-service — prefix `/api/tenant/my`
+
+Defined in the same `attendance.php` file **outside** the `attendance` prefix group.
+
+| Method | Path (relative to `/api/tenant/my`) | Controller | Notes |
+|--------|--------------------------------------|------------|--------|
+| `GET` | `attendance` | `MyAttendanceReadController@summary` | Current user’s summary; no `attendance.view` required for own data |
+| `GET` | `attendance/sessions` | `MyAttendanceReadController@sessions` | Same |
+| `GET` | `children/{id}/attendance` | `MyAttendanceReadController@childSummary` | **Not implemented** — returns **501** until parent/guardian product rules exist |
+
+### 1.5 Not registered
+
+| Intended | Status |
+|----------|--------|
+| `GET /api/tenant/attendance/records/{id}/audit` | **Commented out** — `AttendanceAuditReadController` not wired |
 
 ---
 
@@ -70,8 +103,8 @@ One row per tenant (`tenant_id` **unique**): `lock_period_hours`, `threshold_per
 
 ### 2.4 Other tables
 
-- **`attendance_audit_logs`** (`2026_03_16_054818_create_attendance_audit_logs_table.php`) — audit trail for changes (wired in write use cases).
-- **`staff_attendance`** (`2026_03_16_060000_create_staff_attendance_table.php`) — schema exists; **API routes for staff attendance are commented out** in `attendance.php`.
+- **`attendance_audit_logs`** (`2026_03_16_054818_create_attendance_audit_logs_table.php`) — audit trail for changes (wired in write use cases). **HTTP read** for a single record audit is not exposed (see §1.5).
+- **`staff_attendance`** (`2026_03_16_060000_create_staff_attendance_table.php`) — used by staff read/write routes in §1.3.
 
 ---
 
@@ -81,25 +114,24 @@ One row per tenant (`tenant_id` **unique**): `lock_period_hours`, `threshold_per
 |----------|------|
 | `CreateAdHocSessionUseCase` | New session without timetable link |
 | `LinkTimetableSessionUseCase` | Bind `timetable_session_id` |
-| `BulkMarkAttendanceUseCase` | `sessions/{id}/mark`; checks capabilities, session state, settings; audit |
+| `BulkMarkAttendanceUseCase` | `sessions/{id}/mark`; checks **`attendance.manage`**, session state, settings; audit |
 | `UpdateAttendanceRecordUseCase` | PATCH record; **rejects** when session `isLocked` unless business rules apply (see code) |
-| `OverrideAttendanceRecordUseCase` | POST override; requires **`CAP_ATTENDANCE_OVERRIDE`**; does not duplicate the normal “locked session” path for standard edits |
+| `OverrideAttendanceRecordUseCase` | POST override; requires **`attendance.manage`** |
 | `CompleteAttendanceSessionUseCase` | POST complete; sets marking completed, `marked_by` / `marked_at` |
 | `UpdateAttendanceSettingsUseCase` | PUT settings |
-| `UpdateStaffAttendanceUseCase`, `BulkMarkStaffAttendanceUseCase` | Present in codebase; **no live routes** in `attendance.php` at time of writing |
+| `UpdateStaffAttendanceUseCase`, `BulkMarkStaffAttendanceUseCase` | Wired to **`PATCH staff/{id}`** and **`POST staff/mark`** |
 
-Queries: `ListAttendanceSessionsQuery`, services under `AttendanceQueryService` / `StaffAttendanceQueryService`.
+Queries / read services: `ListAttendanceSessionsQuery`, `AttendanceQueryService`, `StaffAttendanceQueryService` (report/staff/report controllers delegate to these patterns).
 
 ---
 
-## 4. Capabilities (not route middleware)
+## 4. Capabilities & module entitlement
 
-Use cases reference capability keys such as:
+- **Module:** `module.erp.attendance` maps to capabilities **`attendance.view`** and **`attendance.manage`** in `ModuleCapabilityMap`.
+- **Route middleware:** `tenant.capability:attendance.view` on report and staff **read** groups; `tenant.capability:attendance.manage` on staff **write** routes (`staff/mark`, `staff/{id}`).
+- **Use cases:** Most mutations and session listing checks use **`attendance.manage`** or **`attendance.view`** via `TenantCapabilityCheckerInterface` (not legacy `CAP_*` strings).
 
-- **`CAP_ATTENDANCE_MARK`** — bulk mark, update (where allowed), complete session.
-- **`CAP_ATTENDANCE_OVERRIDE`** — override endpoint and elevated paths in update logic.
-
-These are **not** the string `attendance.manage` from older drafts; map them to tenant roles/capabilities in seed data and admin UI.
+Tests that need attendance capabilities to resolve typically mock or seed **`module.erp.attendance`** (and often `module.lms`) so `userHasCapability` returns true for the actor.
 
 ---
 
@@ -113,7 +145,9 @@ These are **not** the string `attendance.manage` from older drafts; map them to 
 
 ## 6. Frontend
 
-There is **no** dedicated `api-endpoints.ts` block for `/api/tenant/attendance` in the same style as batches/blog at time of writing. Dashboard widgets reference **aggregated** attendance metrics (`tenant-dashboard-service`, teacher/global dashboard views). Full session marking UI may be routed elsewhere (e.g. timetable) or pending — treat **HTTP contract** in §1 as the source of truth for integrations.
+Centralized paths: **`API_ENDPOINTS.TENANT_ATTENDANCE`** in [`frontend/config/api-endpoints.ts`](../../../../frontend/config/api-endpoints.ts) (includes nested **`MY`** for `/api/tenant/my/attendance`, `/api/tenant/my/attendance/sessions`, and `children/{id}/attendance`). Thin wrappers live in [`frontend/services/tenant-attendance-service.ts`](../../../../frontend/services/tenant-attendance-service.ts).
+
+Dashboard widgets may continue to use aggregated metrics from `tenant-dashboard-service`. **Full session marking UI** (timetable-integrated or standalone screens calling `bulkMark`, etc.) is a separate product effort—constants and service are ready for consumers.
 
 ---
 
@@ -125,10 +159,14 @@ There is **no** dedicated `api-endpoints.ts` block for `/api/tenant/attendance` 
 | Domain | `backend/app/Domain/TenantAdminDashboard/Attendance/` |
 | HTTP | `backend/app/Http/Controllers/Api/TenantAdminDashboard/Attendance/` |
 | Routes | `backend/routes/tenant_dashboard/attendance.php` |
+| Frontend API | `frontend/config/api-endpoints.ts` — `TENANT_ATTENDANCE` |
+| Frontend service | `frontend/services/tenant-attendance-service.ts` |
 
 ---
 
 ## 8. Document history
 
-- Replaced references to non-existent `UpdateAttendanceStatusUseCase` and generic `attendance.manage` route middleware with **actual** use-case names and **CAP_*** capability checks.
-- Documented **commented-out** routes and **staff** tables so readers do not assume full ERP surface from HTTP alone.
+- Replaced references to non-existent `UpdateAttendanceStatusUseCase` and legacy **`CAP_*`**-only capability names with **`attendance.view`** / **`attendance.manage`** and `ModuleCapabilityMap`.
+- **2026-03:** Documented **live** student reports, staff attendance, and **`/api/tenant/my`** self-service routes; noted **501** for parent/child attendance and **unregistered** record audit GET.
+- Older drafts stated that most report/staff/self-service routes were commented out — **that is obsolete** for the current repository.
+- **2026-03-30:** Centralized frontend API paths (`TENANT_ATTENDANCE`) and `tenant-attendance-service.ts`.

@@ -82,8 +82,8 @@ The application-layer Blog module does **not** use `Cache::` facades in a way th
 ## 5. Security & content safety
 
 - **Tenancy:** Posts and categories are tenant-scoped; public access is filtered by **tenant slug** and the public website gate.
-- **Comments:** Stored text; **sanitize/escape on output** in the SPA and any HTML renderers — do not rely on DB-level “sanitization” alone.
-- **XSS:** Treat `content` and `comment` as untrusted unless a dedicated sanitizer is applied in the pipeline.
+- **Comments (tenant admin write paths):** **`EditBlogCommentUseCase`** and **`ReplyToBlogCommentUseCase`** run comment text through **`HtmlSanitizerInterface`** (implementation: **`HtmlPurifierSanitizer`**, package **`ezyang/htmlpurifier`**) with an allowlist (`p`, `br`, `strong`, `em`, `b`, `i`, links with `http`/`https`, lists). Still **escape or sanitize on any other render path** (SPA, public HTML) as defense in depth.
+- **XSS:** Treat **`content`** on posts and any data from **public** APIs as untrusted in renderers unless the same sanitizer policy is guaranteed end-to-end.
 
 ---
 
@@ -114,3 +114,4 @@ The application-layer Blog module does **not** use `Cache::` facades in a way th
 - Replaced generic “ResolveLocale middleware” narrative with **Accept-Language** behavior from `PublicWebsiteBlogController`.
 - Documented **`module.blog`**, **`blog.manage`**, and **public** routes explicitly.
 - Noted **slug** uniqueness as defined in migration (unique column on `blog_posts` within the tenant database).
+- Documented **HTMLPurifier**-based sanitization for admin comment edit/reply use cases.
