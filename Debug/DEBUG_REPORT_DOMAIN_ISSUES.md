@@ -1,0 +1,94 @@
+# DEBUG REPORT � Domain Layer Issues (Manual Compliance)
+
+Date: 2026-03-23
+Scope: `backend/app/Domain`
+Reference: `documentation/Guides/Ubotz 2 developer instruction manual .md`
+
+## Summary
+This report lists domain-layer rule violations found against the UBOTZ 2.0 Developer Instruction Manual. These are architectural and security risks, especially around tenant isolation and layer boundaries.
+
+## Findings
+
+
+
+
+### 5) Tenant Repository Methods Missing `tenantId` (Critical) [In Progress]
+Rule: Every repository method for tenant data must accept `int $tenantId` to enforce isolation.
+
+
+backend/app/Domain/TenantAdminDashboard/Course/Repositories/VideoWatchProgressRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/CustomDomain/Repositories/CustomDomainRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/CustomPage/Repositories/TenantCustomPageRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Enrollment/Repositories/BundleEnrollmentRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Enrollment/Repositories/CourseEnrollmentRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Enrollment/Repositories/QuizEnrollmentRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/ExamHierarchy/Repositories/ExamChapterRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/ExamHierarchy/Repositories/ExamRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/ExamHierarchy/Repositories/ExamTopicRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/ExamHierarchy/Repositories/SubjectRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/FileManager/Repositories/DirectoryRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/FileManager/Repositories/ManagedFileRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Installment/Repositories/InstallmentOrderPaymentRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Installment/Repositories/InstallmentOrderRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Installment/Repositories/InstallmentPlanRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/LandingPage/Repositories/LandingPageQueryInterface.php
+backend/app/Domain/TenantAdminDashboard/LandingPage/Repositories/LandingPageRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/LandingPage/Repositories/LandingPageSectionRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/LandingPage/Repositories/TenantNavigationRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/LeadManagement/Repositories/LeadFollowUpRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/LeadManagement/Repositories/LeadNoteRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/LeadManagement/Repositories/LeadRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/LeaveManagement/Repositories/LeaveBalanceRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/LeaveManagement/Repositories/LeaveRequestRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/LeaveManagement/Repositories/LeaveTypeRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Meeting/Repositories/MeetingAvailabilityRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Meeting/Repositories/MeetingSlotClaimRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Notification/Repositories/NotificationRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Payment/Repositories/InvoiceRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Payment/Repositories/PaymentTransactionRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Payment/Repositories/StudentInvoiceRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Pricing/Repositories/PricingRuleRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Pricing/Repositories/SpecialOfferRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Pricing/Repositories/TicketRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Quiz/Repositories/QuestionBankRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Quiz/Repositories/QuizAttemptSnapshotRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Quiz/Repositories/QuizQuestionOptionRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Quiz/Repositories/QuizQuestionPairRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Quiz/Repositories/QuizQuestionRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Quiz/Repositories/QuizRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Quiz/QuizResultRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Quiz/Repositories/QuizResultResponseRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Quiz/Repositories/QuizSectionRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Reward/Repositories/RewardConfigRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Reward/Repositories/RewardLedgerRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Role/Repositories/TenantCapabilityRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Role/Repositories/TenantRoleRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Store/Repositories/ProductCategoryRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Store/Repositories/ProductFaqRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Store/Repositories/ProductFileRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Store/Repositories/ProductOrderRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Store/Repositories/ProductRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Subscription/Repositories/SubscriptionEnrollmentRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Subscription/Repositories/SubscriptionPlanRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Timetable/Repositories/HolidayRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Timetable/Repositories/ScheduleTemplateRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Timetable/Repositories/SessionInstanceRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Timetable/Repositories/TemplateSlotRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/Timetable/Repositories/VenueRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/User/Repositories/EducationRecordRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/User/Repositories/ExperienceRecordRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/User/Repositories/InstructorRequestRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/User/Repositories/TenantUserRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/User/Repositories/UserRepositoryInterface.php
+backend/app/Domain/TenantAdminDashboard/UserGroup/Repositories/UserGroupRepositoryInterface.php
+```
+
+Impact:
+- High risk of cross-tenant data access.
+- Violates the manual�s �Iron Rule� for tenant isolation.
+
+
+## Notes
+- This report focuses on Domain layer issues only. Application and Infrastructure layers were not audited here.
+- Fixes should preserve strict boundaries and introduce domain-friendly DTOs or interfaces where framework types are currently exposed.
+
