@@ -15,15 +15,15 @@ Courses are organized into a logical, multi-tier structure to facilitate structu
 - **Assessment Links**: Courses are mapped to `Exam Hierarchy` nodes, ensuring that quizzes and exams are contextually relevant to the subject matter.
 
 ### 2. Student Progress & Engagement
-- **Learning Tracking**: The system maintains a per-student ledger of completed lessons and files (`course_learnings`), allowing students to resume their progress across multiple sessions.
-- **Reviews & Feedback**: Students provide qualitative feedback and star ratings via `course_reviews`. These metrics are syndicated back to the `Landing Page` to build institutional social proof.
+- **Learning Tracking**: The system maintains a per-student ledger of completed lessons and files (`course_learnings`), allowing students to resume their progress across multiple sessions. Last-view metadata supports resuming within a course.
+- **Reviews & Feedback**: Students submit structured feedback via `course_reviews` (multi-axis scores such as content quality and instructor skills, plus an overall average and optional text). Moderation status controls what appears publicly. These metrics can feed landing-page and catalog experiences for social proof.
 
 ## Operational & Commercial Modalities
 
 ### 1. Monetization Strategy
-- **Tuition & Pricing**: Courses support fixed-price enrollments with integration into the `Payment` and `Installment` engines.
-- **Access Windows**: The `access_days` attribute enforces time-limited enrollment. Upon expiry, the student’s access to lessons and assessments is automatically revoked, driving subscription renewals.
-- **Capacity Governance**: Hard ceilings on student count ensure that live-heavy or resource-intensive courses maintain a high quality of service.
+- **Tuition & Pricing**: Courses support fixed-price enrollments with integration into payment, checkout, and installment flows (including bundle and batch contexts where applicable).
+- **Access Windows**: The `access_days` attribute drives enrollment expiry (`expires_at`). Access checks also consider bundle, batch, and subscription-based entitlements in addition to direct enrollment.
+- **Capacity Governance**: Course `capacity` can constrain enrollments in composite flows (e.g. bundles); exact rules depend on product configuration and the enrollment path.
 
 ### 2. Visibility & Marketing
 - **Private vs. Public**: The `is_private` flag allows for corporate-only (B2B) courses that do not appear in the public catalog but remain accessible via direct enrollment links or administrative assignment.
@@ -37,5 +37,6 @@ Courses are organized into a logical, multi-tier structure to facilitate structu
 ---
 
 ## Linked References
-- **Related Modules**: `Enrollment`, `Chapter`, `Payment`, `Exam-Hierarchy`, `Reward`.
-- **Infrastructure**: `File-Manager` for asset hosting.
+- **Technical detail**: `Ubotz_2_course_technical_documentation.md` in this folder (API routes, schema, and implementation-aligned workflows).
+- **Related Modules**: `Enrollment`, `Chapter`, `Payment`, `Exam-Hierarchy`, `Bundle`, `Batch`, `Subscription`, `Reward`.
+- **Infrastructure**: File manager and storage for course media; tenant-scoped paths for uploads.
