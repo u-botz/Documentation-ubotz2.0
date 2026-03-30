@@ -1,34 +1,31 @@
-﻿# UBOTZ 2 User Technical Documentation
+# UBOTZ 2.0 User Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/User
-- Domain module: backend/app/Domain/TenantAdminDashboard/User
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/User
-- Route files:
-  - backend/routes/tenant_dashboard/users.php
+## Core Architecture
+Users are the primary entities within the `TenantAdminDashboard\User` bounded context. They are persisted in the tenant-specific database but are rigorously scoped to ensure platform-wide data integrity.
 
-## Footprint Summary
-- Application files: 45
-- Domain files: 43
-- Infrastructure files: 11
-- Endpoint declarations (route files sampled): 29
+## Relational Schema Constraints (`users`)
+Derived from the `2026_02_22_000001_create_users_table.php` schema:
 
-## Security and Authorization Notes
-- ->middleware('tenant.capability:user.view');
-- ->middleware('tenant.capability:user.manage');
-- ->middleware('tenant.capability:user.manage'); // using manage capability for verify
-- ->middleware('tenant.capability:user.manage'); // using manage capability for hard delete
+| Column | Technical Significance |
+| :--- | :--- |
+| **`tenant_id`** | **CRITICAL:** Foundational isolation key. Every query MUST apply this scope via `BelongsToTenant`. |
+| **`email`** | Unique only when combined with `tenant_id` (`unq_users_email_tenant`). |
+| **`token_version`** | Int-based versioning for JWT/Session invalidation. Incrementing this immediately logs the user out globally. |
+| **`status`** | Enforced at the `Auth` middleware layer. Non-active statuses (e.g., `invited`, `locked`) block session instantiation. |
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+## Extended Schemas
+The User module is augmented by several sub-tables for rich profiles:
+- `user_education_records` / `user_experience_records`
+- `user_occupations`
+- `user_branch_assignments`: Links users to the physical `Branch` context.
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
+## Performance & Security
+- **Indices**: `idx_users_tenant_status` ensures rapid filtering for dashboard user listings.
+- **Audit**: `last_login_ip` and `last_login_at` provide a baseline security trail for tenant administrators.
+- **Force Reset**: `force_password_reset` boolean is checked during the login handshake to redirect users to the password update flow.
+
+---
 
 ## Linked References
-- Status report: ../../status reports/User_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_user_feature_documentation.md
+- Multi-Tenancy Invariants: See `Backend Architecture Master § 5.1`.
+- Related Modules: `Role`, `Tenant-Provisioning`.

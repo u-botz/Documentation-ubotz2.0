@@ -1,27 +1,19 @@
-﻿# UBOTZ 2 Course Business Findings
+# UBOTZ 2.0 Course Business Findings
 
-## Purpose
-This draft captures business-level intent and current implementation signals for the tenant-side Course feature.
+## Executive Summary
+The `Course` feature sits at the apex of the tenant's educational taxonomy. It is the primary sellable entity that dictates pricing, access windows, pedagogical curriculum, and student assignment boundaries. Without an active Course, assessments and billing fail to function conceptually.
 
-## What This Feature Delivers
-- Core tenant workflow coverage for course operations.
-- Dashboard/API support for administrative actions and reporting.
-- Role/capability-oriented access boundaries across endpoints.
+## Operational Modalities
 
-## Observed Implementation Signals
-- Route files analyzed: 6
-- Approximate endpoint declarations: 100
-- Application/Domain/Infrastructure footprint: 190/154/66 files
+### The Monetization Engine
+- **`price_amount`**: Dictates base tuition for B2C conversion funnels. Can act as a free-tier boundary.
+- **`access_days`**: Restricts the maximum tenure of an enrollment. This is highly utilized for "Subscription-like" rolling courses preventing lifetime access unless desired.
+- **`is_private` toggle**: Hides the listing from the `Landing Page` directories while still allowing direct-link purchases by invited organizations or B2B sales leads.
 
-## Business Risks / Gaps To Validate
-- Confirm all critical user journeys are reflected in frontend pages and policies.
-- Confirm no hidden dependency on platform-only settings for tenant workflows.
-- Validate expected empty-state UX for list pages (no false error states).
+### Course Lifecycles
+1. Courses initialize in a `draft` state (imperceptible to front-end students).
+2. During the `draft` state, administrators compile **Tags**, map the Course to an **Exam Hierarchy**, and assign an underlying `teacher_id`.
+3. Transitioning to `published` immediately signals the `Payment` and `Landing-Page` engines to syndicate the listing publicly.
 
-## Compliance and Tenant Isolation
-- Feature behavior must remain tenant-scoped in all reads, writes, and exports.
-- Audit-sensitive actions should be traceable by actor, action, and entity.
-
-## Linked References
-- Status report: ../../status reports/Course_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_course_feature_documentation.md
+### Capacity Overrides
+Administrators deploy a hard `capacity` limit. Once an active participant list hits this ceiling, automatic enrollment gateways are intentionally blocked, shifting prospects into a B2B "waitlist" mode or forcing the administrator to boot an adjacent `Batch`.

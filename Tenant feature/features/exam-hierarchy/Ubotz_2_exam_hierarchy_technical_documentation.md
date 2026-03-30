@@ -1,32 +1,24 @@
-﻿# UBOTZ 2 Exam Hierarchy Technical Documentation
+# UBOTZ 2.0 Exam Hierarchy Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/ExamHierarchy
-- Domain module: backend/app/Domain/TenantAdminDashboard/ExamHierarchy
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/ExamHierarchy
-- Route files:
-  - backend/routes/tenant_dashboard/exam_hierarchy.php
+## Core Architecture
+The `exam-hierarchy` fundamentally bounds the core educational payload. It differs from `Category` which organizes commercial presentation; instead, this defines strict pedagogical outlines required by competitive testing modules.
 
-## Footprint Summary
-- Application files: 9
-- Domain files: 15
-- Infrastructure files: 9
-- Endpoint declarations (route files sampled): 7
+## Relational Schema Constraints 
+Defined across multiple incremental migrations (`2026_02_26_195600_create_exams_table.php`, `subjects`, `exam_chapters`, `exam_topics`).
 
-## Security and Authorization Notes
-- ->middleware('tenant.capability:exam.view');
-- ->middleware('tenant.capability:exam.manage');
+### Root: `exams`
+- **`tenant_id`**: Structural invariant. Covered by `idx_exams_tenant`.
+- **`slug`**: A tenant-unique string identifier `idx_exams_tenant_slug(tenant_id, slug)`.
+- Validates status downstream via `is_active` boolean integer.
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+### The Downstream Nesting Vectors
+Although they map identically conceptually to categories, these are rigorously defined tables:
+1. `exams` (Root, e.g., NEET)
+2. `subjects` (Child, e.g., Biology)
+3. `exam_chapters` (Grandchild, e.g., Human Physiology)
+4. `exam_topics` (Great-Grandchild, e.g., Digestion)
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
+**Key Technical Differentiator**: Because these tables are partitioned instead of recursively pointing to themselves (unlike `categories` table's `parent_id`), queries executing `$O(1)` joins between `subjects` $\rightarrow$ `exams` are significantly faster and easier to index than infinite recursive CTE depth.
 
-## Linked References
-- Status report: ../../status reports/ExamHierarchy_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_examhierarchy_feature_documentation.md
+## Dependencies Context
+These tables are rigorously referenced by the `question_bank` composite indices (`idx_qbank_hierarchy`) to pull test questions instantaneously against specific Syllabus components. Deleting an `exam_id` forces restrict constraints.

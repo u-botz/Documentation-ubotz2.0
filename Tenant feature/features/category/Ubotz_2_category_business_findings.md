@@ -1,27 +1,12 @@
-﻿# UBOTZ 2 Category Business Findings
+# UBOTZ 2.0 Category Business Findings
 
-## Purpose
-This draft captures business-level intent and current implementation signals for the tenant-side Category feature.
+## Executive Summary
+For multi-discipline tenants (e.g. teaching K-12 and Competitive test prep concurrently), the Category module acts as the primary navigational interface driving course discovery on the front-end, organizing disparate subjects into logical retail buckets.
 
-## What This Feature Delivers
-- Core tenant workflow coverage for category operations.
-- Dashboard/API support for administrative actions and reporting.
-- Role/capability-oriented access boundaries across endpoints.
+## Recursive Organizational Workflows
+Unlike rigid single-layer tags, Categories allow a Parent $\rightarrow$ Child hierarchy to infinite depth.
+- E.g. **Engineering** (Parent) $\rightarrow$ **Computer Science** (Child) $\rightarrow$ **Data Structures** (Grandchild).
+- **Presentation Driven**: Administrators leverage `icon` vectors and manual `order` integer-driven sorting to intentionally highlight specific product verticals above others on public platforms.
 
-## Observed Implementation Signals
-- Route files analyzed: 1
-- Approximate endpoint declarations: 5
-- Application/Domain/Infrastructure footprint: 8/9/2 files
-
-## Business Risks / Gaps To Validate
-- Confirm all critical user journeys are reflected in frontend pages and policies.
-- Confirm no hidden dependency on platform-only settings for tenant workflows.
-- Validate expected empty-state UX for list pages (no false error states).
-
-## Compliance and Tenant Isolation
-- Feature behavior must remain tenant-scoped in all reads, writes, and exports.
-- Audit-sensitive actions should be traceable by actor, action, and entity.
-
-## Linked References
-- Status report: ../../status reports/Category_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_category_feature_documentation.md
+## Destructive Cascades
+- Business Risk: Due to the nested relationships, deleting a top-level **Parent** Category structurally annihilates every child category nested beneath it. This removes the `category_id` references from previously attached courses, risking layout destruction on the storefront. Operations must re-assign courses prior to root deletions.

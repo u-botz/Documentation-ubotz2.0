@@ -1,32 +1,32 @@
-﻿# UBOTZ 2 Role Technical Documentation
+# UBOTZ 2.0 Role Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/Role
-- Domain module: backend/app/Domain/TenantAdminDashboard/Role
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/Role
-- Route files:
-  - backend/routes/tenant_dashboard/roles.php
+## Core Architecture
+Roles are managed as platform-level definitions applied per-tenant. The implementation utilizes a Centralized RBAC model where role definitions live in the Central DB to ensure consistency across the platform.
 
-## Footprint Summary
-- Application files: 9
-- Domain files: 12
-- Infrastructure files: 3
-- Endpoint declarations (route files sampled): 7
+## Relational Schema Constraints
 
-## Security and Authorization Notes
-- ->middleware('tenant.capability:role.view');
-- ->middleware('tenant.capability:role.manage');
+### 1. Definitions (Central DB)
+- **`tenant_roles`**: Stores the role identity (`slug`, `display_name`).
+- **`tenant_capabilities`**: The master list of all possible actions in the system.
+- **`tenant_role_capabilities`**: The join table mapping capabilities to specific roles (`idx_role_capability`).
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+### 2. Assignments (Tenant DB)
+- **`user_role_assignments`**: Links a `user_id` inside a tenant's database to a `role_id` from the central catalog.
+  - **Constraint**: One primary role is typically assigned per user, though the schema supports multiple assignments for complex staff duties.
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
+## Authorization Middleware
+Access control is enforced via the `tenant.capability:{slug}` middleware.
+1. The middleware identifies the authenticated User.
+2. It resolves the User's assigned Roles from `user_role_assignments`.
+3. it checks if any assigned Role possesses the required Capability in `tenant_role_capabilities`.
+4. If found, the request proceeds; otherwise, a `403 Forbidden` is returned.
+
+## Performance Optimization
+- **Caching**: Capability assignments are heavily cached using Redis (namespaced by `tenant_id`) to avoid expensive cross-database joins on every HTTP request.
+- **Indices**: `uq_tenant_roles_tenant_slug` ensures role uniqueness within a tenant scope.
+
+---
 
 ## Linked References
-- Status report: ../../status reports/Role_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_role_feature_documentation.md
+- Security Checklist: See `Global Rule § RBAC`.
+- Related Modules: `User`, `Auth`.

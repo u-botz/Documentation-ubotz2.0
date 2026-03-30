@@ -1,27 +1,29 @@
-﻿# UBOTZ 2 File Manager Business Findings
+# UBOTZ 2.0 File Manager Business Findings
 
-## Purpose
-This draft captures business-level intent and current implementation signals for the tenant-side File Manager feature.
+## Executive Summary
+The File Manager is the centralized asset repository for Ubotz 2.0 tenants. It acts as a digital cross-reference engine for educational materials (PDFs, Videos), marketing assets (Logos, Banners), and student submissions (Assignments). It provides a unified, secure, and structured interface for managing all binary data across the tenant ecosystem.
 
-## What This Feature Delivers
-- Core tenant workflow coverage for file manager operations.
-- Dashboard/API support for administrative actions and reporting.
-- Role/capability-oriented access boundaries across endpoints.
+## Operational Modalities
 
-## Observed Implementation Signals
-- Route files analyzed: 1
-- Approximate endpoint declarations: 10
-- Application/Domain/Infrastructure footprint: 16/19/4 files
+### 1. Centralized vs. Contextual Storage
+The system distinguishes between general administrative assets and curriculum-bound materials:
+- **Managed Files (`managed_files`)**: General-purpose files (e.g., student profile pictures, receipt PDFs, tenant branding assets) authored by specific users.
+- **Course Files (`course_files`)**: Instructional materials bound to specific **Courses** and **Chapters**. These files are the core educational deliverables students consume during their learning journey.
 
-## Business Risks / Gaps To Validate
-- Confirm all critical user journeys are reflected in frontend pages and policies.
-- Confirm no hidden dependency on platform-only settings for tenant workflows.
-- Validate expected empty-state UX for list pages (no false error states).
+### 2. Media Rendering & Accessibility
+- **`accessibility`**: Determines whether a file is `free` (publicly accessible) or `paid` (locked behind a Course Enrollment gate).
+- **`downloadable`**: A business-level toggle allowing instructors to restrict students from locally saving high-value proprietary assets.
+- **Streaming Support**: Through `file_source` (e.g., `upload` or `vimeo`/`youtube`), the system handles both local S3 storage and external video providers.
 
-## Compliance and Tenant Isolation
-- Feature behavior must remain tenant-scoped in all reads, writes, and exports.
-- Audit-sensitive actions should be traceable by actor, action, and entity.
+### 3. Hierarchical Organization
+- **Directory Structure**: Using `directory_id`, the system allows admins to organize thousands of assets into logical folders, preventing "file clutter" in large enterprise deployments.
+
+## Commercial Integration
+- **Revenue Protection**: By mapping files to specific `course_id` entries and enforcing enrollment-based tokens, the system prevents unauthorized sharing of proprietary curriculum content.
+- **Auditing**: `size_bytes` tracking allows the Platform Root to monitor storage quotas per tenant, ensuring billing accuracy for high-volume media usage.
+
+---
 
 ## Linked References
-- Status report: ../../status reports/FileManager_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_filemanager_feature_documentation.md
+- Status report: `../../status reports/FileManager_Status_Report.md`
+- Related Modules: `Course`, `Assignment`, `Student Billing`.

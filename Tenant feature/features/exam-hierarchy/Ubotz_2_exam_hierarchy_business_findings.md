@@ -1,27 +1,17 @@
-﻿# UBOTZ 2 Exam Hierarchy Business Findings
+# UBOTZ 2.0 Exam Hierarchy Business Findings
 
-## Purpose
-This draft captures business-level intent and current implementation signals for the tenant-side Exam Hierarchy feature.
+## Executive Summary
+For LMS tenants acting as test-preparation academies (e.g., JEE, UPSC, IELTS), categorizing a course simply as "Math" is insufficient. The `Exam Hierarchy` feature supports the rigidly defined syllabus architectures mandatory in these B2B verticals.
 
-## What This Feature Delivers
-- Core tenant workflow coverage for exam hierarchy operations.
-- Dashboard/API support for administrative actions and reporting.
-- Role/capability-oriented access boundaries across endpoints.
+## The 4-Tier Syllabus Matrix
+Administrators and Instructors must map all assessment material through an explicit pipeline, locking educational assets to a concrete position:
 
-## Observed Implementation Signals
-- Route files analyzed: 1
-- Approximate endpoint declarations: 7
-- Application/Domain/Infrastructure footprint: 9/15/9 files
+1. **Exam:** E.g., "JEE Main 2026"
+2. **Subject:** E.g., "Physics"
+3. **Chapter:** E.g., "Kinematics"
+4. **Topic:** E.g., "Projectile Motion"
 
-## Business Risks / Gaps To Validate
-- Confirm all critical user journeys are reflected in frontend pages and policies.
-- Confirm no hidden dependency on platform-only settings for tenant workflows.
-- Validate expected empty-state UX for list pages (no false error states).
+## Commercial Implications
+By enforcing this taxonomy across both **Courses** and the **Question Bank**, the platform guarantees profound post-examination analytics. When a mock test completes, the hierarchy allows the dashboard to explicitly calculate and report: "Student X is ranking 85th percentile in Kinematics (Chapter) but 22nd percentile in Projectile Motion (Topic)". 
 
-## Compliance and Tenant Isolation
-- Feature behavior must remain tenant-scoped in all reads, writes, and exports.
-- Audit-sensitive actions should be traceable by actor, action, and entity.
-
-## Linked References
-- Status report: ../../status reports/ExamHierarchy_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_examhierarchy_feature_documentation.md
+Without enforcing the 4-tier Exam Hierarchy binding on assignments and quizzes, deep subject-matter diagnostics—a massive commercial selling point—are impossible.

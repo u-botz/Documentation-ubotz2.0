@@ -1,32 +1,14 @@
-﻿# UBOTZ 2 Branch Technical Documentation
+# UBOTZ 2.0 Branch Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/Branch
-- Domain module: backend/app/Domain/TenantAdminDashboard/Branch
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/Branch
-- Route files:
-  - backend/routes/tenant_dashboard/branch.php
+## Context & Architectural Goal
+The `Branch` entity sits outside the strict academic context (Courses/Assessments). It functions as the primary spatial boundary delineating physical operations or logical subsidiaries inside a singular Tenant.
 
-## Footprint Summary
-- Application files: 10
-- Domain files: 12
-- Infrastructure files: 3
-- Endpoint declarations (route files sampled): 6
+## Schema Map (`branches`)
+Derived from the `2026_03_17_210500_create_branches_table.php` invariant:
+- **`tenant_id`**: Universal isolation boundary. Enforced structurally.
+- **`code`**: A string identifying the branch (e.g., "DEL-01"). Uniquely indexed composite constraint: `unq_branches_tenant_code(tenant_id, code)`.
+- **State Properties**: Uses a simplistic `is_active` boolean integer instead of formal `softDeletes()`. 
+- **Performance Boundary**: Covered by `idx_branches_tenant_active`.
 
-## Security and Authorization Notes
-- Route::middleware(['tenant.capability:branch.view'])->group(function () {
-- Route::middleware(['tenant.capability:branch.manage'])->group(function () {
-
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
-
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
-
-## Linked References
-- Status report: ../../status reports/Branch_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_branch_feature_documentation.md
+## Policy & Tenancy
+Queries fetching or mutating `Branch` objects must conform to `BelongsToTenant` scope traits to prevent offline-center information from leaking across parallel tenants on the central platform. Support APIs rely intrinsically on `tenant_id` cascading.

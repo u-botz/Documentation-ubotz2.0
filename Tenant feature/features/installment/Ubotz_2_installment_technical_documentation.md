@@ -1,32 +1,31 @@
-﻿# UBOTZ 2 Installment Technical Documentation
+# UBOTZ 2.0 Installment Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/Installment
-- Domain module: backend/app/Domain/TenantAdminDashboard/Installment
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/Installment
-- Route files:
-  - backend/routes/tenant_dashboard/installment.php
+## Core Architecture
+The Installment module resides within the `TenantAdminDashboard\Installment` bounded context. It provides a state-machine-driven interface for managing multi-step payment obligations.
 
-## Footprint Summary
-- Application files: 23
-- Domain files: 24
-- Infrastructure files: 13
-- Endpoint declarations (route files sampled): 13
+## Relational Schema Constraints
 
-## Security and Authorization Notes
-- Route::prefix('installment-plans')->middleware('tenant.capability:installment.manage')->group(function () {
-- Route::prefix('installment-orders')->middleware('tenant.capability:installment.manage')->group(function () {
+### 1. Configuration Layer
+- **`installment_plans`**: Root metadata for the plan (title, description, upfront config).
+- **`installment_steps`**: Defines the individual milestones (percentage/amount, due days relative to start).
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+### 2. Execution Layer
+- **`installment_orders`**: The active instance of a plan attached to a specific student and course.
+- **`installment_order_payments`**: Represents individual payment attempts or partial settlements against an installment step.
+- **`idx_courses_installment_plan`**: (Optional) Courses can define a `default_installment_plan_id`.
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
+## Key Technical Workflows
 
-## Linked References
-- Status report: ../../status reports/Installment_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_installment_feature_documentation.md
+### Generating Installment Orders
+1. Student selects a course and chooses an installment plan.
+2. `GenerateInstallmentOrderUseCase` calculates the exact `due_at` dates and amounts (cents) based on the plan's `upfront_value` and subsequent `installment_steps`.
+3. An `installment_order` is instantiated, and a `student_order` (type: `installment`) is created for the initial upfront payment.
+
+### Processing Payments
+1. When a `student_order` for an installment is marked `paid`, the `UpdateInstallmentOrderPaymentUseCase` is triggered.
+2. The logic marks the specific installment step as `settled` and checks if further blocks on the student's `course_enrollment` should be lifted.
+
+## Tenancy & Security
+- **Multi-Tenancy**: Every query is strictly scoped against `tenant_id`. 
+- **Integrity**: `installment_order_payments` is tightly coupled to the parent `installment_orders` table via cascading foreign keys, preventing orphaned payment records.
+- **Branch Context**: Installment orders are tagged with `branch_id` for localized financial auditing.

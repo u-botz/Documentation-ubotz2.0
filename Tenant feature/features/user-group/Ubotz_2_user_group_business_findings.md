@@ -1,27 +1,23 @@
-﻿# UBOTZ 2 User Group Business Findings
+# UBOTZ 2.0 User Group Business Findings
 
-## Purpose
-This draft captures business-level intent and current implementation signals for the tenant-side User Group feature.
+## Executive Summary
+User Groups provide a logical layer for clustering users beyond their standardized Roles. They are primarily used by administrators for bulk communication, targeted promotional offers, and specialized reporting segments (e.g., "Scholarship Students", "Weekend Batch Users").
 
-## What This Feature Delivers
-- Core tenant workflow coverage for user group operations.
-- Dashboard/API support for administrative actions and reporting.
-- Role/capability-oriented access boundaries across endpoints.
+## Operational Modalities
 
-## Observed Implementation Signals
-- Route files analyzed: 1
-- Approximate endpoint declarations: 6
-- Application/Domain/Infrastructure footprint: 6/2/3 files
+### 1. Segmentation & Targeting
+- **Bulk Actions**: Allows administrators to send notifications or emails to a specific subset of users without manually selecting individuals.
+- **Special Offers**: Groups can be used as the target for `special_offer_user_groups`, unlocking specific pricing or course access only for group members.
+- **Ticketing**: Support tickets can be routed or restricted based on group membership (`ticket_user_groups`).
 
-## Business Risks / Gaps To Validate
-- Confirm all critical user journeys are reflected in frontend pages and policies.
-- Confirm no hidden dependency on platform-only settings for tenant workflows.
-- Validate expected empty-state UX for list pages (no false error states).
+### 2. Management Workflow
+- **Creation**: Groups are created with a simple `name` and `status` (active/inactive).
+- **Membership**: Users can belong to multiple groups simultaneously, allowing for many-to-many organizational structures.
 
-## Compliance and Tenant Isolation
-- Feature behavior must remain tenant-scoped in all reads, writes, and exports.
-- Audit-sensitive actions should be traceable by actor, action, and entity.
+## Commercial Integration
+Groups are a powerful CRM tool. By segmenting students by performance or demographic into groups, tenants can execute highly targeted re-engagement campaigns or offer "Early Bird" discounts to loyal student clusters.
+
+---
 
 ## Linked References
-- Status report: ../../status reports/UserGroup_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_usergroup_feature_documentation.md
+- Related Modules: `User`, `Notification`, `Subscription`.

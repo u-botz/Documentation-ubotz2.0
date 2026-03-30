@@ -1,33 +1,43 @@
-﻿# UBOTZ 2 Payment Technical Documentation
+# UBOTZ 2.0 Payment Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/Payment
-- Domain module: backend/app/Domain/TenantAdminDashboard/Payment
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/Payment
-- Route files:
-  - backend/routes/tenant_dashboard/payment.php
-  - backend/routes/tenant_dashboard/student_payments.php
-  - backend/routes/tenant_dashboard/billing.php
+## Core Architecture
+The Payment module is the most technically critical bounded context (`TenantAdminDashboard\Payment`). It manages high-stakes external gateway integrations while ensuring rigorous multi-tenant data isolation and financial integrity.
 
-## Footprint Summary
-- Application files: 11
-- Domain files: 18
-- Infrastructure files: 3
-- Endpoint declarations (route files sampled): 17
+## Relational Schema Constraints
 
-## Security and Authorization Notes
-- Capability middleware usage should be reviewed per route group and policy checks.
+### 1. Order Layer
+- **`student_orders`**: The central transactional ledger record.
+  - **`total_amount_cents`**: Stored as an integer (cents) to avoid floating-point rounding errors.
+  - **`stripe_payment_intent_id`**: Stores the unique identifier from the external gateway for cross-referencing.
+  - **`idempotency_key`**: Bound unique index `idx_student_orders_idempotency` prevents duplicate order instantiation.
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+### 2. Gateway Settings
+- **`tenant_stripe_settings`**: Stores encrypted gateway credentials (`secret_key_encrypted`, `webhook_secret_encrypted`). These are encrypted at rest using the platform's `APP_KEY`.
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
+### 3. Event Logging & Safety
+- **`student_payment_events`**: Immutable log of every raw payload received from Stripe/Razorpay (`payload` JSON). This allows for post-facto re-processing or auditing if a webhook handler fails.
+- **`payment_transactions`**: Generic ledger table used for non-order-based movements or historical reconciliation.
+
+## Key Technical Workflows
+
+### The Webhook Pipeline
+1. `WebhookController` receives a raw POST body from Stripe.
+2. The signature is verified using the tenant's `webhook_secret_encrypted`.
+3. The event is persisted to `student_payment_events`.
+4. A background `ProcessStripeEventJob` is dispatched.
+5. The job resolves the `student_order` via the `payment_intent_id` and executes the `MarkOrderAsPaidUseCase`.
+
+### Refund Execution
+- **`student_refunds`**: When a refund is requested, the system makes a synchronous API call to the gateway.
+- If the gateway returns success, the status shifts to `succeeded` and the parent order is flagged as `refunded`.
+
+## Tenancy & Security
+- **Encryption**: sensitive keys are never stored in plaintext (`text` column type, encrypted using Laravel's base encrypter).
+- **Isolation**: Tenant A's webhook endpoint cannot be spoofed to mark Tenant B's orders as paid, as the `webhook_secret` is resolved per-tenant.
+- **Auditing**: `payment_attempt_count` and `failed_at` columns provide defensive diagnostics for troubleshooting checkout failures.
+
+---
 
 ## Linked References
-- Status report: ../../status reports/Payment_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_payment_feature_documentation.md
+- Status report: `../../status reports/Payment_Status_Report.md`
+- Related Modules: `Fee`, `Installment`, `Enrollment`.

@@ -1,32 +1,31 @@
-﻿# UBOTZ 2 Subscription Technical Documentation
+# UBOTZ 2.0 Subscription Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/Subscription
-- Domain module: backend/app/Domain/TenantAdminDashboard/Subscription
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/Subscription
-- Route files:
-  - backend/routes/tenant_dashboard/subscription.php
+## Core Architecture
+The Subscription module resides in the Central Database to ensure platform-wide consistency and prevent tenants from modifying their own billing metadata.
 
-## Footprint Summary
-- Application files: 17
-- Domain files: 23
-- Infrastructure files: 8
-- Endpoint declarations (route files sampled): 6
+## Relational Schema Constraints
 
-## Security and Authorization Notes
-- Route::prefix('subscription-plans')->middleware('tenant.capability:subscription.manage')->group(function () {
-- Route::post('/enroll', EnrollSubscriptionPlanController::class)->middleware('tenant.capability:subscription.enroll');
+### 1. Plan Definitions (`subscription_plans`)
+- **`code`**: Unique machine-readable SKU.
+- **`price_monthly` / `price_annual`**: Stored as BigInt cents.
+- **`features`**: JSON column storing specific feature flags (e.g., SSO: true).
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+### 2. Active Tracking (`tenant_subscriptions`)
+- **`current_period_ends_at`**: The timestamp used by the `CheckTenantStatusMiddleware` to verify active access.
+- **`gateway_subscription_id`**: The raw reference to the Stripe/Razorpay subscription object.
+- **Indices**: `idx_subscriptions_period_end` optimizes the bulk "Past Due" scheduler that runs daily.
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
+## Hard Resource Constraints
+The platform enforces plan limits at the Application Tier.
+- **User Limits**: Checked during `User::create` via the `TenantSubscriptionService`.
+- **Course Limits**: Checked during `Course::published`.
+- **Storage**: Monitored via the File Manager before committing new S3 uploads.
+
+## Security & Payment Integrity
+- **Idempotency**: `idempotency_key` on the `tenant_subscriptions` table prevents duplicate plan assignments during browser retries or webhook delays.
+- **Locked Prices**: `locked_prices` boolean ensures that if a plan's price is updated, existing tenants remain on their legacy pricing until their next renewal cycle.
+
+---
 
 ## Linked References
-- Status report: ../../status reports/Subscription_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_subscription_feature_documentation.md
+- Related Modules: `Tenant-Provisioning`, `Payment`.

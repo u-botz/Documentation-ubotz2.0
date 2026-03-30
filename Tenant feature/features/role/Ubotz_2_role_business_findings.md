@@ -1,27 +1,26 @@
-﻿# UBOTZ 2 Role Business Findings
+# UBOTZ 2.0 Role Business Findings
 
-## Purpose
-This draft captures business-level intent and current implementation signals for the tenant-side Role feature.
+## Executive Summary
+The Role module implements a robust Role-Based Access Control (RBAC) system. It allows Tenant administrators to define exactly what each user can see and do within the platform, from high-level "Owner" access to granular "Instructor" or "Staff" permissions.
 
-## What This Feature Delivers
-- Core tenant workflow coverage for role operations.
-- Dashboard/API support for administrative actions and reporting.
-- Role/capability-oriented access boundaries across endpoints.
+## Operational Modalities
 
-## Observed Implementation Signals
-- Route files analyzed: 1
-- Approximate endpoint declarations: 7
-- Application/Domain/Infrastructure footprint: 9/12/3 files
+### 1. Capability-Based Authorization
+Unlike rigid, hard-coded roles, Ubotz roles are collections of **Capabilities**.
+- **Examples**: `quiz.create`, `payment.view`, `attendance.mark`.
+- This allows for flexible staff structures where a "Branch Manager" might have payment viewing rights while a "Teacher" is restricted only to academic content.
 
-## Business Risks / Gaps To Validate
-- Confirm all critical user journeys are reflected in frontend pages and policies.
-- Confirm no hidden dependency on platform-only settings for tenant workflows.
-- Validate expected empty-state UX for list pages (no false error states).
+### 2. System vs. Custom Roles
+- **System Roles**: Pre-defined templates (Owner, Admin, Instructor, Student) that ensure core platform workflows remain intact.
+- **Custom Roles**: (Optional/Enterprise) Allows tenants to create bespoke definitions like "Librarian" or "Junior Accountant" by selecting specific capability bundles.
 
-## Compliance and Tenant Isolation
-- Feature behavior must remain tenant-scoped in all reads, writes, and exports.
-- Audit-sensitive actions should be traceable by actor, action, and entity.
+### 3. Hierarchy & Governance
+Roles follow a hierarchy that prevents lower-level staff (e.g., an Instructor) from modifying higher-level settings (e.g., Tenant Billing) even if they were inadvertently granted a conflicting capability.
+
+## Staff Role Expansion
+Recent updates have expanded the "Staff" role capabilities, especially for Lead Management and CRM functions, allowing localized branch staff to handle the entire lead-to-enrollment funnel.
+
+---
 
 ## Linked References
-- Status report: ../../status reports/Role_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_role_feature_documentation.md
+- Related Modules: `User`, `Tenant-Provisioning`.

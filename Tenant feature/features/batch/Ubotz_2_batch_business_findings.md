@@ -1,27 +1,12 @@
-﻿# UBOTZ 2 Batch Business Findings
+# UBOTZ 2.0 Batch Business Findings
 
-## Purpose
-This draft captures business-level intent and current implementation signals for the tenant-side Batch feature.
+## Executive Summary
+For the UBOTZ platform, a `Course` dictates **what** is taught, while a `Batch` dictates **when** and to **whom**. Batches act as the fundamental student containment vessels (Cohorts). They represent scheduled executions of academic material bound tightly to performance timetables.
 
-## What This Feature Delivers
-- Core tenant workflow coverage for batch operations.
-- Dashboard/API support for administrative actions and reporting.
-- Role/capability-oriented access boundaries across endpoints.
+## Operational Modalities
+- **Bounded Enrollment:** Batches bypass the global Course capacity bounds via their own `max_capacity` limit. E.g. A course may handle 10,000 students via video, but a specific live webinar Batch is strictly constrained to 50 active learners.
+- **Schedules (`start_date`, `end_date`)**: Limits the exact lifecycle of the interaction. When the `end_date` triggers, automation processes optionally revoke interactive permissions (like live classes) while retaining VOD (Video on Demand) access depending on broader Tenant policies.
+- **Lifecycle Overhaul**: Unlike standard deletions which destroy data integrity, assigning an `archived_at` timestamp safely tucks a completed Batch away while maintaining its connection to past `enrollment_histories`.
 
-## Observed Implementation Signals
-- Route files analyzed: 1
-- Approximate endpoint declarations: 12
-- Application/Domain/Infrastructure footprint: 15/26/9 files
-
-## Business Risks / Gaps To Validate
-- Confirm all critical user journeys are reflected in frontend pages and policies.
-- Confirm no hidden dependency on platform-only settings for tenant workflows.
-- Validate expected empty-state UX for list pages (no false error states).
-
-## Compliance and Tenant Isolation
-- Feature behavior must remain tenant-scoped in all reads, writes, and exports.
-- Audit-sensitive actions should be traceable by actor, action, and entity.
-
-## Linked References
-- Status report: ../../status reports/Batch_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_batch_feature_documentation.md
+### The `code` Paradigm
+- Business operators enforce internal SKUs like "JEE-2026-WKND-A" across the `code` attribute. This matches B2B accounting ledgers ensuring LMS data exports map seamlessly to third-party CRM ingestion tools.

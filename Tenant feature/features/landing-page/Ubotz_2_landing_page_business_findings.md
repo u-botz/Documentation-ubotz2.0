@@ -1,27 +1,16 @@
-﻿# UBOTZ 2 Landing Page Business Findings
+# UBOTZ 2.0 Landing Page Business Findings
 
-## Purpose
-This draft captures business-level intent and current implementation signals for the tenant-side Landing Page feature.
+## Executive Summary
+For the UBOTZ Tenant, the Landing Page acts as the digital storefront and initial point of sales acquisition. B2B operators leverage landing pages to rapidly construct marketing funnels, inject bespoke branding, and govern SEO footprints for their explicitly published competitive exam arrays or B2C catalog offerings.
 
-## What This Feature Delivers
-- Core tenant workflow coverage for landing page operations.
-- Dashboard/API support for administrative actions and reporting.
-- Role/capability-oriented access boundaries across endpoints.
+## Operational Modalities
 
-## Observed Implementation Signals
-- Route files analyzed: 2
-- Approximate endpoint declarations: 33
-- Application/Domain/Infrastructure footprint: 33/26/13 files
+### Global Templating
+- **`template_id`**: Tenants are shielded from coding HTML. They inherit structural blueprints (Templates) curated by the **Platform Root/Super Admins**. 
 
-## Business Risks / Gaps To Validate
-- Confirm all critical user journeys are reflected in frontend pages and policies.
-- Confirm no hidden dependency on platform-only settings for tenant workflows.
-- Validate expected empty-state UX for list pages (no false error states).
+### JSON Styling & Analytics Configs
+- Tenants control visual variables (Color palettes, Logos, Hero text bounds) through intuitive backend forms parameterized directly into `branding`.
+- **Acquisition Hooks**: The `seo_config` dynamically drives meta descriptions, Open Graph (OG) shares for social networks, and integrates vital marketing tools (Facebook Pixels, Google Tag Manager scripts).
 
-## Compliance and Tenant Isolation
-- Feature behavior must remain tenant-scoped in all reads, writes, and exports.
-- Audit-sensitive actions should be traceable by actor, action, and entity.
-
-## Linked References
-- Status report: ../../status reports/LandingPage_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_landingpage_feature_documentation.md
+### Publication State
+- Deployments operate via standard state cycles (`draft` $\rightarrow$ `published`). Subdomains map instantly to `published` layouts. Nullifying or pulling down the page enforces maintenance mode or internal redirects logic without requiring server-side Apache/Nginx DNS restarts.

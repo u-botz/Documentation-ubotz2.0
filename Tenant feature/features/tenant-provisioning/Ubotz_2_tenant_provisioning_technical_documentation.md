@@ -1,33 +1,33 @@
-﻿# UBOTZ 2 Tenant Provisioning Technical Documentation
+# UBOTZ 2.0 Tenant Provisioning Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/Settings
-- Domain module: backend/app/Domain/TenantAdminDashboard/Settings
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/Settings
-- Route files:
-  - backend/routes/tenant_dashboard/usage.php
-  - backend/routes/tenant_dashboard/settings.php
+## Core Architecture
+Provisioning is the core logic managed by the Platform Root. It is responsible for initializing the `TenantContext` for every institution.
 
-## Footprint Summary
-- Application files: 2
-- Domain files: 0
-- Infrastructure files: 1
-- Endpoint declarations (route files sampled): 6
+## Relational Schema Constraints (`tenants`)
+Derived from the `2026_02_17_214641_create_tenants_table.php` schema in the Central DB:
 
-## Security and Authorization Notes
-- ->middleware('tenant.capability:settings.view');
-- ->middleware('tenant.capability:settings.manage');
+| Column | Technical Significance |
+| :--- | :--- |
+| **`slug`** | unique indexed URI identifier used by `ResolveTenant` middleware. |
+| **`db_dedicated`** | Boolean flag determining which database driver to instantiate at runtime. |
+| **`status`** | Primary state machine (`pending`, `active`, `suspended`, `archived`). |
+| **`settings`** | JSON store for tenant-wide environmental overrides (timezones, locales). |
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+## Provisioning Pipeline
+Handled by the `ProvisionTenantJob`:
+1. **Validation**: Check for `slug` and `domain` collision in `tenants`.
+2. **Registration**: Create `tenants` record and default `tenant_configs`.
+3. **Seeding**:
+   - Seed default `tenant_roles` and `tenant_role_capabilities` for the new institution.
+   - Create initial `User` (Owner role).
+4. **Subscription Initialization**: Assign the selected `subscription_plan`.
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
+## Security & Performance
+- **Run Tracking**: `tenant_provisioning_runs` table tracks every attempt, ensuring audit integrity for Super Admins.
+- **Middleware Integration**: Every request to a tenant subdomain runs through the `ResolveTenant` middleware which queries the `tenants` table to verify active status before yielding execution.
+- **Custom Domains**: `tenant_domain_mappings` allowing for CNAME aliases (e.g. `lms.oxford.edu`) mapping back to the primary slug.
+
+---
 
 ## Linked References
-- Status report: ../../status reports/Tenant_Provisioning_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_tenant_provisioning_feature_documentation.md
+- Related Modules: `Subscription`, `Auth`, `Role`.

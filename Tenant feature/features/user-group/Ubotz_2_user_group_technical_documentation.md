@@ -1,32 +1,28 @@
-﻿# UBOTZ 2 User Group Technical Documentation
+# UBOTZ 2.0 User Group Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/UserGroup
-- Domain module: backend/app/Domain/TenantAdminDashboard/UserGroup
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/UserGroup
-- Route files:
-  - backend/routes/tenant_dashboard/user_groups.php
+## Core Architecture
+User Groups are implemented as a light-weight organizational layer in the Tenant database. They utilize a standard many-to-many relationship with the `User` entity.
 
-## Footprint Summary
-- Application files: 6
-- Domain files: 2
-- Infrastructure files: 3
-- Endpoint declarations (route files sampled): 6
+## Relational Schema Constraints
 
-## Security and Authorization Notes
-- ->middleware('tenant.capability:user_group.view');
-- ->middleware('tenant.capability:user_group.manage');
+### 1. Definition (`user_groups`)
+- **`tenant_id`**: Strict isolation boundary.
+- **`name`**: Unique per tenant (`unique(['tenant_id', 'name'])`).
+- **`status`**: Boolean-like state (`active`, `inactive`) governing group visibility.
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+### 2. Membership (`user_group_members`)
+- Join table linking `user_groups.id` to `users.id`.
+- Enforces an index on `tenant_id` to ensure membership queries remain within the tenant's security boundary.
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
+## Integration Points
+- **Support Tickets**: `ticket_user_groups` maps groups to specific helpdesk visibility.
+- **Marketing**: `special_offer_user_groups` binds groups to pricing concessions and course bundles.
+
+## Performance Invariants
+- **Soft Deletes**: Enabled on the `user_groups` table to prevent catastrophic data loss in cross-referenced modules (like Tickets) if a group is removed.
+- **Tenant Scoping**: All group lookups are filtered through the standard global scope.
+
+---
 
 ## Linked References
-- Status report: ../../status reports/UserGroup_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_usergroup_feature_documentation.md
+- Related Modules: `User`, `CommunicationHub`.

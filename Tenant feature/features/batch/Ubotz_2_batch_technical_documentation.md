@@ -1,35 +1,19 @@
-﻿# UBOTZ 2 Batch Technical Documentation
+# UBOTZ 2.0 Batch Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/Batch
-- Domain module: backend/app/Domain/TenantAdminDashboard/Batch
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/Batch
-- Route files:
-  - backend/routes/tenant_dashboard/batch.php
+## Context & Architectural Precedence
+The `TenantAdminDashboard\Batch` aggregate isolates strict cohort logic away from the general `Course` definition. It enables an $M:N$ operational mapping structure where a single Course can spawn a theoretically infinite sequence of independent temporal instances.
 
-## Footprint Summary
-- Application files: 15
-- Domain files: 26
-- Infrastructure files: 9
-- Endpoint declarations (route files sampled): 12
+## Base Schema Constraints (`batches`)
+Implemented dynamically through the `2026_03_19_000001_create_batches_table.php` schema.
+- **`tenant_id`**: Invariant $O(1)$ lookup constraint preventing data-leaks to competing tenant accounts. `fk_batches_tenants` asserts a rigid `cascadeOnDelete()`.
+- **Compound Keys**: `unq_batches_tenant_code(tenant_id, code)` implements a strictly enforced natural ID matrix, enforcing operators to supply distinct syllabus markers without colliding globally.
 
-## Security and Authorization Notes
-- Route::middleware('tenant.capability:batch.view')->group(function () {
-- ->middleware('tenant.capability:batch.update')
-- ->middleware('tenant.capability:batch.manage_faculty')
-- ->middleware('tenant.capability:batch.create');
-- ->middleware('tenant.capability:batch.delete')
+### Performance Indicators
+The `start_date` and `end_date` date-components form a distinct indexing priority: `idx_batches_tenant_dates`. This enables dashboard queries resolving "All active batches for Date X" to bypass full-table scans.
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+## State Transitions
+1. `draft` $\rightarrow$ `published` $\rightarrow$ soft archiving.
+2. The core logic omits generic Laravel Soft Deletions (`deleted_at`) resolving instead to `archived_at`. This ensures legacy batch rosters remain immutable while actively removing them from `EnrollmentUseCase` lookups.
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
-
-## Linked References
-- Status report: ../../status reports/Batch_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_batch_feature_documentation.md
+## Access Policy
+Admin actions against `Batches` apply capabilities like `batch.view`, `batch.create` via Tenant Role hierarchies. `fk_batches_creator` locks down `restrict` deletion rules ensuring audit integrity for the operating actor.

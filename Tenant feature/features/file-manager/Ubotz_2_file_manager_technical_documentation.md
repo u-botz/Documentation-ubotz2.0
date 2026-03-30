@@ -1,38 +1,44 @@
-﻿# UBOTZ 2 File Manager Technical Documentation
+# UBOTZ 2.0 File Manager Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/FileManager
-- Domain module: backend/app/Domain/TenantAdminDashboard/FileManager
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/FileManager
-- Route files:
-  - backend/routes/tenant_dashboard/file_manager.php
+## Core Architecture
+The File Manager handles the abstraction between the application and the physical storage layer (Local/S3). The logic resides within the `TenantAdminDashboard\FileManager` bounded context.
 
-## Footprint Summary
-- Application files: 16
-- Domain files: 19
-- Infrastructure files: 4
-- Endpoint declarations (route files sampled): 10
+## Relational Schema Constraints
 
-## Security and Authorization Notes
-- Route::get('/browse', [FileManagerReadController::class, 'browse'])->middleware('tenant.capability:file.view');
-- Route::get('/files/{id}', [FileManagerReadController::class, 'show'])->middleware('tenant.capability:file.view');
-- Route::get('/files/{id}/download', [FileManagerReadController::class, 'download'])->middleware('tenant.capability:file.view');
-- Route::post('/upload', [FileManagerWriteController::class, 'upload'])->middleware('tenant.capability:file.upload');
-- Route::post('/files/{id}/rename', [FileManagerWriteController::class, 'renameFile'])->middleware('tenant.capability:file.manage');
-- Route::post('/files/{id}/move', [FileManagerWriteController::class, 'moveFile'])->middleware('tenant.capability:file.manage');
-- Route::delete('/files/{id}', [FileManagerWriteController::class, 'deleteFile'])->middleware('tenant.capability:file.manage');
-- Route::post('/directories', [FileManagerWriteController::class, 'createDirectory'])->middleware('tenant.capability:file.create_directory');
+### 1. The Managed Repository (`managed_files`)
+Used for generic tenant assets.
+- **`storage_disk`**: Defaults to `local` or `s3`, allowing the tenant to shift between providers without logic changes.
+- **`storage_path`**: The unique pointer to the physical file on the disk or Cloud Bucket.
+- **`directory_id`**: Self-referential lookup for folder nesting logic.
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+### 2. The Curriculum Engine (`course_files`)
+Tightly coupled to the academic footprint.
+| Field | Technical Significance |
+| :--- | :--- |
+| `course_id` / `chapter_id` | Foreign-key bounds to the Course Management context. |
+| `file_source` | Logic branch for resolving the URI (`upload` vs. `external`). |
+| `volume_mb` | Used for quota calculations and front-end pre-fetch hints. |
+| `sort_order` | Manages the display sequence within a course chapter view. |
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
+## Key Technical Workflows
+
+### File Upload & Persistence
+1. `UploadFileUseCase` validates MIME types and file sizes.
+2. The file is streamed to the `storage_disk`.
+3. A `managed_files` record is created, and the unique `storage_path` is returned.
+4. (Optional) For curriculum assets, a `course_files` bridge record is instantiated linking the file to a course.
+
+### Secure Access (URL Generation)
+- **Tokenized Access**: When a student requests a `paid` file, the `GetFileUrlUseCase` verifies the student's active enrollment.
+- It then generates a temporary, time-limited S3 signed URL or serves the file through a protected Laravel route proxying the stream.
+
+## Tenancy & Security
+- **Multi-Tenancy**: Every query is strictly filtered by `tenant_id`. No scenario allows a user from Tenant A to guess the `storage_path` of an asset belonging to Tenant B.
+- **Idempotency Keys**: `file_upload_idempotency_keys` table prevents duplicate S3 uploads during concurrent browser retry attempts.
+- **Soft Deletions**: Enabled on high-value metadata to allow administrative rollbacks.
+
+---
 
 ## Linked References
-- Status report: ../../status reports/FileManager_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_filemanager_feature_documentation.md
+- Status report: `../../status reports/FileManager_Status_Report.md`
+- Related Modules: `Course`, `Assignment`, `Student Billing`.

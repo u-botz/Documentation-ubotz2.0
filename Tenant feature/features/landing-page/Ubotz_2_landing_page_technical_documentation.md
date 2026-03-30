@@ -1,36 +1,14 @@
-﻿# UBOTZ 2 Landing Page Technical Documentation
+# UBOTZ 2.0 Landing Page Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/LandingPage
-- Domain module: backend/app/Domain/TenantAdminDashboard/LandingPage
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/LandingPage
-- Route files:
-  - backend/routes/tenant_dashboard/landing_page.php
-  - backend/routes/tenant_dashboard/custom_domain.php
+## Core Architecture
+Landing pages operate dynamically as the B2C acquisition interface for tenant products. Governed by `2026_03_13_154702_create_landing_pages_table.php`, they implement a specialized architectural boundary resolving front-end templating configurations against the main `Central DB` template repository.
 
-## Footprint Summary
-- Application files: 33
-- Domain files: 26
-- Infrastructure files: 13
-- Endpoint declarations (route files sampled): 33
+## Relational Schema Maps (`landing_pages`)
+| Column | Technical Significance |
+| :--- | :--- |
+| **Tenancy Isolation** | `tenant_id` - Universal boundary. Handled inherently by `BelongsToTenant` scope. |
+| **Central Cross-Reference** | `template_id` - Not enforced as a strict Foreign Key inside the MySQL engine because it inherently maps across database networks directly into the Platform/Root architecture. Enforced at the application tier. |
+| **Payload Engines** | `branding` / `seo_config` - JSON/`jsonb` storage clusters. Accommodates vast dynamic CSS, Google Analytics tokens, pixel integrations, and meta-tag hierarchies without incurring hundreds of rigid SQL columns. |
 
-## Security and Authorization Notes
-- Route::middleware(['tenant.module:module.website', 'tenant.capability:landing_page.view'])->group(function () {
-- Route::middleware(['tenant.module:module.website', 'tenant.capability:landing_page.manage'])->group(function () {
-- ->middleware('tenant.capability:custom_domain.view');
-- ->middleware('tenant.capability:custom_domain.manage');
-- ->middleware(['tenant.capability:custom_domain.manage', 'throttle:5,1']);
-
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
-
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
-
-## Linked References
-- Status report: ../../status reports/LandingPage_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_landingpage_feature_documentation.md
+### Technical Render Workflows
+When the `ResolveTenant` middleware successfully instantiates an inbound subdomain URI, it routes the default `/` request directly via `landing_pages` where `status = published`. Rendering the specific Next.js/React framework DOM is dependent directly upon merging `branding` properties with the referenced `template_id` JSX layout.

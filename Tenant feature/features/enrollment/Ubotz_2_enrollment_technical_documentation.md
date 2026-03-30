@@ -1,31 +1,18 @@
-﻿# UBOTZ 2 Enrollment Technical Documentation
+# UBOTZ 2.0 Enrollment Technical Specification
 
-## Backend Scope
-- Application module: backend/app/Application/TenantAdminDashboard/
-- Domain module: backend/app/Domain/TenantAdminDashboard/
-- Infrastructure module: backend/app/Infrastructure/Persistence/TenantAdminDashboard/
-- Route files:
-  - backend/routes/tenant_dashboard/enrollment.php
+## Core Architecture
+The Enrollment context dictates the authorization boundary for student access. It serves as the active cross-reference between the Identity bounded context (`users`) and the Product context (`courses`), mapping via `2026_03_05_052939_create_course_enrollments_table.php`.
 
-## Footprint Summary
-- Application files: 0
-- Domain files: 0
-- Infrastructure files: 0
-- Endpoint declarations (route files sampled): 6
+## Schema Constraints (`course_enrollments`)
 
-## Security and Authorization Notes
-- Capability middleware usage should be reviewed per route group and policy checks.
+| Column | Technical Significance |
+| :--- | :--- |
+| `tenant_id` | Core isolation barrier. Bound structurally. |
+| `source` | Identifies the ingestion mechanism (`free`, `purchase`, `subscription`). Critical for financial reconciliation and preventing operators from refunding internally-granted complimentary access. |
+| `expires_at` | Enforced chronologically at the `CheckCourseAccessUseCase` gate. Overrides native course lengths if explicitly set by administrators. |
+| `status` | State definitions (`active`, `expired`, `revoked`). Replaces standard deletion models to preserve historical engagement reporting. |
 
-## API and Contract Notes
-- Keep request/response payloads stable and tenant-scoped.
-- Return explicit validation errors for form-driven workflows.
-- Use canonical status values in APIs; normalize legacy values at UI boundary if needed.
+**Crucial Invariant:** `$table->unique(['tenant_id', 'user_id', 'course_id'])` explicitly blocks double-purchasing vectors, ensuring idempotency from external gateway webhook events.
 
-## Testing Recommendations
-- Feature tests for tenant isolation (Tenant A cannot access Tenant B data).
-- Policy tests for all privileged endpoints.
-- Regression tests for list/read/create/update/delete/status-change operations.
-
-## Linked References
-- Status report: ../../status reports/Enrollment_Status_Report.md
-- Consolidated feature doc: ../../feature documents/Ubotz_2_enrollment_feature_documentation.md
+## Dependency Triggers
+Enrollment generation is deeply coupled to Domain Events emitted from the `Payment` and `Subscription` Bounded Contexts. Raw execution of `CourseEnrollment` factories outside these listener queues inherently risks desynchronizing financial audit paths.
