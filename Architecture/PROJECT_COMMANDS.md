@@ -119,3 +119,4 @@ npm run dev
 - **`backend/database/migrations/central/`**: Landlord/Platform migrations.
 - **`backend/database/migrations/tenant/`**: Tenant-specific migrations.
 ```
+
